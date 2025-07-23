@@ -5,11 +5,9 @@ This is the backend server for the Digital African Women platform, a digital com
 ## Features
 
 - User Authentication & Authorization
-- Membership Tier Management
 - Product Marketplace
 - Shopping Cart
 - Order Management
-- Testimonials System
 - Role-based Access Control
 
 ## Tech Stack
@@ -48,14 +46,6 @@ backend/
 - PUT /api/users/:id - Update user profile
 - DELETE /api/users/:id - Delete user
 
-### Memberships
-- POST /api/memberships - Create membership tier
-- GET /api/memberships - Get all tiers
-- GET /api/memberships/:id - Get specific tier
-- PUT /api/memberships/:id - Update tier
-- DELETE /api/memberships/:id - Delete tier
-- POST /api/memberships/subscribe - Subscribe to tier
-
 ### Products
 - POST /api/products - Add product
 - GET /api/products - Get all products
@@ -72,16 +62,6 @@ backend/
 ### Orders
 - POST /api/orders - Create order
 - GET /api/orders - Get all orders
-- GET /api/orders/:id - Get specific order
-- PUT /api/orders/:id - Update order status
-- DELETE /api/orders/:id - Cancel order
-
-### Testimonials
-- POST /api/testimonials - Add testimonial
-- GET /api/testimonials - Get all testimonials
-- GET /api/testimonials/:id - Get specific testimonial
-- PUT /api/testimonials/:id - Update testimonial
-- DELETE /api/testimonials/:id - Delete testimonial
 
 ## Environment Variables
 

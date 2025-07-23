@@ -6,11 +6,9 @@ const dotenv = require('dotenv');
 // Import routes
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
-const membershipRoutes = require('./routes/memberships');
 const productRoutes = require('./routes/products');
 const cartRoutes = require('./routes/cart');
 const orderRoutes = require('./routes/orders');
-const testimonialRoutes = require('./routes/testimonials');
 
 // Load environment variables
 dotenv.config();
@@ -40,11 +38,9 @@ mongoose.connect(MONGODB_URI, {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/memberships', membershipRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/testimonials', testimonialRoutes);
 
 // Basic route
 app.get('/', (req, res) => {

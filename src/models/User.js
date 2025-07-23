@@ -32,10 +32,6 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
-  membershipTier: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'MembershipTier',
-  },
   isEmailVerified: {
     type: Boolean,
     default: false,
