@@ -16,6 +16,15 @@ const validateRegistration = [
     .withMessage('Password must be at least 6 characters long')
     .matches(/\d/)
     .withMessage('Password must contain a number'),
+  body('confirmPassword')
+    .notEmpty()
+    .withMessage('Confirm password is required')
+    .custom((value, { req }) => {
+      if (value !== req.body.password) {
+        throw new Error('Passwords do not match');
+      }
+      return true;
+    }),
   body('role')
     .optional()
     .isIn(Object.values(ROLES))
@@ -36,7 +45,7 @@ router.post('/register', validateRegistration, async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, email, password, role = ROLES.USER } = req.body;
+    const { name, email, password, confirmPassword, role = ROLES.BUYER } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });

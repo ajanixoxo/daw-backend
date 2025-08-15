@@ -1,110 +1,176 @@
-# Digital African Women Platform - Backend
+# Digital African Women Backend
 
-This is the backend server for the Digital African Women platform, a digital commerce platform that supports African women entrepreneurs.
+A comprehensive e-commerce backend API with user authentication, product management, cart functionality, and order processing.
 
 ## Features
 
-- User Authentication & Authorization
-- Product Marketplace
-- Shopping Cart
-- Order Management
-- Role-based Access Control
+- User authentication and authorization (Admin, Seller, Buyer roles)
+- Product management with approval workflow
+- Shopping cart functionality
+- Order processing
+- **Stock/Inventory Management System**
+- Role-based access control
+- Input validation and security
 
-## Tech Stack
+## Stock Management API
 
-- Node.js
-- Express.js
-- MongoDB with Mongoose
-- JWT Authentication
-- Cloudinary (Image Upload)
-- Express Validator
-- Various security middlewares
+### Admin Stock Management Endpoints
 
-## Project Structure
-
+#### Get All Products with Stock Information
 ```
-backend/
-├── src/
-│   ├── models/          # Database models
-│   ├── routes/          # API routes
-│   ├── middleware/      # Custom middleware
-│   ├── controllers/     # Route controllers
-│   ├── utils/          # Helper functions
-│   └── server.js       # Main application file
-├── package.json
-└── README.md
+GET /api/stock
+Authorization: Bearer <admin_token>
+Query Parameters:
+- page: Page number (default: 1)
+- limit: Items per page (default: 10)
+- sortBy: Sort field (default: 'title')
+- sortOrder: 'asc' or 'desc' (default: 'asc')
+- status: Filter by stock status ('In Stock', 'Low Stock', 'Out of Stock')
+- category: Filter by category
+- lowStock: true/false - Show only low stock items
+- outOfStock: true/false - Show only out of stock items
+- search: Text search in product fields
 ```
 
-## API Endpoints
-
-### Authentication
-- POST /api/auth/signup - Register new user
-- POST /api/auth/login - User login
-
-### Users
-- GET /api/users/:id - Get user profile
-- PUT /api/users/:id - Update user profile
-- DELETE /api/users/:id - Delete user
-
-### Products
-- POST /api/products - Add product
-- GET /api/products - Get all products
-- GET /api/products/:id - Get specific product
-- PUT /api/products/:id - Update product
-- DELETE /api/products/:id - Delete product
-
-### Cart
-- POST /api/cart/add - Add to cart
-- GET /api/cart/:userId - Get user's cart
-- PUT /api/cart/:userId - Update cart
-- DELETE /api/cart/:userId/:productId - Remove from cart
-
-### Orders
-- POST /api/orders - Create order
-- GET /api/orders - Get all orders
-
-## Environment Variables
-
-Create a `.env` file in the root directory with the following variables:
-
-```env
-PORT=5000
-NODE_ENV=development
-MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+#### Get Product Stock Details
+```
+GET /api/stock/:id
+Authorization: Bearer <admin_token>
 ```
 
-## Getting Started
+#### Update Stock Quantity
+```
+PUT /api/stock/:id/update
+Authorization: Bearer <admin_token>
+Body: {
+  "quantity": 50,
+  "reason": "Restocking from supplier"
+}
+```
+
+#### Adjust Stock by Amount
+```
+POST /api/stock/:id/adjust
+Authorization: Bearer <admin_token>
+Body: {
+  "adjustment": -5,  // Negative for removal, positive for addition
+  "reason": "Damaged goods removed"
+}
+```
+
+#### Get Low Stock Alerts
+```
+GET /api/stock/alerts/low-stock
+Authorization: Bearer <admin_token>
+```
+
+#### Get Stock History
+```
+GET /api/stock/:id/history
+Authorization: Bearer <admin_token>
+Query Parameters:
+- page: Page number (default: 1)
+- limit: Items per page (default: 20)
+```
+
+#### Export Stock Report
+```
+GET /api/stock/reports/export
+Authorization: Bearer <admin_token>
+Query Parameters:
+- format: 'json' or 'csv' (default: 'json')
+```
+
+#### Bulk Update Stock
+```
+POST /api/stock/bulk-update
+Authorization: Bearer <admin_token>
+Body: {
+  "updates": [
+    { "productId": "product_id_1", "quantity": 100 },
+    { "productId": "product_id_2", "quantity": 50 }
+  ],
+  "reason": "Monthly inventory update"
+}
+```
+
+### Product Model Changes
+
+The Product model now includes these inventory-related fields:
+
+- `inventory`: Current stock count
+- `stockStatus`: Automatically calculated ('In Stock', 'Low Stock', 'Out of Stock')
+- `lowStockThreshold`: Threshold for low stock alerts (default: 10)
+- `sku`: Stock Keeping Unit (optional)
+- `weight`: Product weight (optional)
+- `dimensions`: Product dimensions (length, width, height)
+- `stockHistory`: Array of stock change records with timestamps and reasons
+
+### Stock Status Automation
+
+- Stock status is automatically updated based on inventory levels
+- Low stock alerts are generated when inventory falls below threshold
+- Stock history is maintained for all changes with user tracking
+
+### Permissions
+
+Stock management requires these permissions:
+- `VIEW_STOCK`: View stock information
+- `MANAGE_STOCK`: Update stock quantities
+- `ADJUST_STOCK`: Make stock adjustments
+- `VIEW_STOCK_HISTORY`: View stock change history
+- `VIEW_LOW_STOCK_ALERTS`: View low stock alerts
+- `EXPORT_STOCK_REPORT`: Export stock reports
+
+### Role Access
+
+- **Admin**: Full access to all stock management features
+- **Seller**: Can view stock information for their own products only
+- **Buyer**: No stock management access (only sees product availability)
+
+## Installation
 
 1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Create `.env` file with required variables
-4. Run the development server:
-   ```bash
-   npm run dev
-   ```
+2. Install dependencies: `npm install`
+3. Set up environment variables in `.env` file
+4. Start the server: `npm start`
 
-## Security Features
+## API Documentation
 
-- JWT Authentication
-- Password Hashing
-- Role-based Authorization
-- Request Validation
-- Security Headers (Helmet)
-- CORS Protection
-- Rate Limiting (planned)
+Base URL: `http://localhost:5000/api`
 
-## Future Enhancements
+### Authentication Required
+Most endpoints require authentication via JWT token in the Authorization header:
+```
+Authorization: Bearer <your_jwt_token>
+```
 
-- Payment Gateway Integration
-- Email Notifications
-- Real-time Updates
-- Analytics Dashboard
-- Mobile App Support
-- Advanced Search Features 
+### Error Responses
+All endpoints return errors in this format:
+```json
+{
+  "message": "Error description",
+  "error": "Detailed error message (in development)"
+}
+```
+
+### Success Responses
+Stock management endpoints return data in this format:
+```json
+{
+  "products": [...],
+  "pagination": {
+    "currentPage": 1,
+    "totalPages": 5,
+    "totalProducts": 50,
+    "limit": 10
+  },
+  "stats": {
+    "totalProducts": 50,
+    "inStock": 30,
+    "lowStock": 15,
+    "outOfStock": 5,
+    "totalInventoryValue": 15000.00
+  }
+}
+``` 

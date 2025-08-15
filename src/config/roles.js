@@ -24,16 +24,28 @@ const PERMISSIONS = {
   VIEW_OWN_PRODUCTS: 'view:own_products',
   MANAGE_CATEGORIES: 'manage:categories',
 
+  // Stock/Inventory permissions
+  VIEW_STOCK: 'view:stock',
+  MANAGE_STOCK: 'manage:stock',
+  VIEW_STOCK_HISTORY: 'view:stock_history',
+  ADJUST_STOCK: 'adjust:stock',
+  VIEW_LOW_STOCK_ALERTS: 'view:low_stock_alerts',
+  EXPORT_STOCK_REPORT: 'export:stock_report',
+
   // Cart permissions
   MANAGE_CART: 'manage:cart',
   VIEW_ALL_CARTS: 'view:all_carts',
   VIEW_CART_ANALYTICS: 'view:cart_analytics',
-  
+
   // Order permissions
   CREATE_ORDER: 'create:order',
   READ_ORDER: 'read:order',
+  UPDATE_ORDER: 'update:order',
+  CANCEL_ORDER: 'cancel:order',
   VIEW_ALL_ORDERS: 'view:all_orders',
   VIEW_OWN_ORDERS: 'view:own_orders',
+  DELETE_PROFILE: 'delete:profile',
+  VIEW_PENDING_PRODUCTS: 'view:pending_products',
 };
 
 const ROLE_PERMISSIONS = {
@@ -54,6 +66,14 @@ const ROLE_PERMISSIONS = {
     PERMISSIONS.DELETE_PRODUCT,
     PERMISSIONS.MANAGE_CATEGORIES,
 
+    // Stock Management
+    PERMISSIONS.VIEW_STOCK,
+    PERMISSIONS.MANAGE_STOCK,
+    PERMISSIONS.VIEW_STOCK_HISTORY,
+    PERMISSIONS.ADJUST_STOCK,
+    PERMISSIONS.VIEW_LOW_STOCK_ALERTS,
+    PERMISSIONS.EXPORT_STOCK_REPORT,
+
     // Cart & Analytics
     PERMISSIONS.VIEW_ALL_CARTS,
     PERMISSIONS.VIEW_CART_ANALYTICS,
@@ -64,15 +84,22 @@ const ROLE_PERMISSIONS = {
     // Profile Management
     PERMISSIONS.READ_PROFILE,
     PERMISSIONS.UPDATE_PROFILE,
-    
+    PERMISSIONS.DELETE_PROFILE,
+
     // Product Management
     PERMISSIONS.CREATE_PRODUCT,
     PERMISSIONS.READ_PRODUCT,
     PERMISSIONS.UPDATE_PRODUCT,
     PERMISSIONS.DELETE_PRODUCT,
-    PERMISSIONS.VIEW_PENDING_PRODUCTS, // To view their own pending products
-    
+    PERMISSIONS.VIEW_PENDING_PRODUCTS,
+
+    // Limited Stock Management (own products only)
+    PERMISSIONS.VIEW_STOCK,
+    PERMISSIONS.VIEW_STOCK_HISTORY,
+
     // Orders
+    PERMISSIONS.READ_ORDER,
+    PERMISSIONS.UPDATE_ORDER,
     PERMISSIONS.VIEW_OWN_ORDERS,
   ],
 
@@ -80,15 +107,18 @@ const ROLE_PERMISSIONS = {
     // Profile Management
     PERMISSIONS.READ_PROFILE,
     PERMISSIONS.UPDATE_PROFILE,
-    
+    PERMISSIONS.DELETE_PROFILE,
+
     // Product Access
     PERMISSIONS.READ_PRODUCT,
-    
+
     // Cart Management
     PERMISSIONS.MANAGE_CART,
-    
+
     // Orders
     PERMISSIONS.CREATE_ORDER,
+    PERMISSIONS.READ_ORDER,
+    PERMISSIONS.CANCEL_ORDER,
     PERMISSIONS.VIEW_OWN_ORDERS,
   ],
 };
