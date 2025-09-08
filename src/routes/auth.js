@@ -99,7 +99,9 @@ router.post('/login', validateLogin, async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { email, password } = req.body;
+    const { email, password, loginType } = req.body;
+
+    
 
     // Find user by email
     const user = await User.findOne({ email });
@@ -118,9 +120,13 @@ router.post('/login', validateLogin, async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    
+
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user._id },
+      { userId: user._id,
+        role: loginType==="admin" ? ROLES.ADMIN : "buyer"
+       },
       process.env.JWT_SECRET || 'your-secret-key-here',
       { expiresIn: '24h' }
     );

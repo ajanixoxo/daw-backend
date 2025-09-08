@@ -13,9 +13,11 @@ const combineAuthorization = (...middlewares) => {
       }
 
       // Check if user is active
-      if (!req.user.isActive) {
+      if (req.user.status !== 'active') {
         return res.status(403).json({ 
-          message: 'Your account has been blocked' 
+          message: 'Your account has been suspended or is inactive',
+          code: 'ACCOUNT_INACTIVE',
+          status: req.user.status
         });
       }
 
@@ -44,6 +46,11 @@ const combineAuthorization = (...middlewares) => {
  */
 const authorizeRoles = (...roles) => {
   return (req, res, next) => {
+    // Admin users have access to all routes
+    if (req.user.role === ROLES.ADMIN) {
+      return next();
+    }
+    
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ 
         message: `Access restricted. Required roles: ${roles.join(', ')}` 
@@ -53,14 +60,27 @@ const authorizeRoles = (...roles) => {
   };
 };
 
+const authorizeAdmin = (req, res, next) => {
+  if (req.user.role === ROLES.ADMIN) {
+    return next();
+  }
+  return res.status(403).json({ 
+    message: 'Access restricted. Only admins can access this resource' 
+  });
+};
+
 /**
  * Permission-based authorization middleware
  * @param {Object} options - Authorization options
  * @param {string[]} options.all - All permissions required
  * @param {string[]} options.any - Any of these permissions required
- */
+ */ 
 const authorizePermissions = (options = {}) => {
   return (req, res, next) => {
+   
+    if (req.user.role === ROLES.ADMIN) {
+      return next();
+    }
     const { all = [], any = [] } = options;
     const userPermissions = ROLE_PERMISSIONS[req.user.role] || [];
 
@@ -95,6 +115,11 @@ const authorizeOwnership = (options = {}) => {
   } = options;
 
   return (req, res, next) => {
+    // Admin users have access to all routes
+    if (req.user.role === ROLES.ADMIN) {
+      return next();
+    }
+    
     const userPermissions = ROLE_PERMISSIONS[req.user.role] || [];
 
     // Permission bypass
@@ -125,6 +150,35 @@ const authorizationPatterns = {
   ),
 
   /**
+   * Cooperative Admin access patterns
+   */
+  cooperativeAdminAccess: {
+    // For managing cooperative members
+    members: combineAuthorization(
+      authorizeRoles(ROLES.COOPERATIVE_ADMIN),
+      authorizePermissions({
+        any: [PERMISSIONS.MANAGE_USERS]
+      })
+    ),
+    
+    // For managing cooperative products
+    products: combineAuthorization(
+      authorizeRoles(ROLES.COOPERATIVE_ADMIN),
+      authorizePermissions({
+        any: [PERMISSIONS.APPROVE_PRODUCT, PERMISSIONS.REJECT_PRODUCT]
+      })
+    ),
+    
+    // For viewing cooperative orders
+    orders: combineAuthorization(
+      authorizeRoles(ROLES.COOPERATIVE_ADMIN),
+      authorizePermissions({
+        any: [PERMISSIONS.VIEW_ALL_ORDERS]
+      })
+    )
+  },
+
+  /**
    * Seller access patterns
    */
   sellerAccess: {
@@ -142,6 +196,14 @@ const authorizationPatterns = {
       authorizeRoles(ROLES.SELLER),
       authorizePermissions({
         any: [PERMISSIONS.VIEW_OWN_ORDERS]
+      })
+    ),
+    
+    // For managing their own store
+    store: combineAuthorization(
+      authorizeRoles(ROLES.SELLER),
+      authorizeOwnership({ 
+        resourceField: 'sellerId'
       })
     )
   },
@@ -164,6 +226,22 @@ const authorizationPatterns = {
       authorizePermissions({
         any: [PERMISSIONS.VIEW_OWN_ORDERS]
       })
+    ),
+    
+    // For managing their own wallet
+    wallet: combineAuthorization(
+      authorizeRoles(ROLES.BUYER),
+      authorizeOwnership({ 
+        resourceField: 'userId'
+      })
+    ),
+    
+    // For leaving reviews
+    reviews: combineAuthorization(
+      authorizeRoles(ROLES.BUYER),
+      authorizePermissions({
+        any: [PERMISSIONS.LEAVE_PRODUCT_REVIEWS]
+      })
     )
   },
 
@@ -176,11 +254,40 @@ const authorizationPatterns = {
       any: [PERMISSIONS.READ_PRODUCT]
     }),
     
-    // For approving/rejecting products (admin only)
+    // For approving/rejecting products (admin + coop admin)
     moderate: combineAuthorization(
+      authorizeRoles(ROLES.ADMIN, ROLES.COOPERATIVE_ADMIN),
+      authorizePermissions({
+        any: [PERMISSIONS.APPROVE_PRODUCT, PERMISSIONS.REJECT_PRODUCT]
+      })
+    )
+  },
+
+  /**
+   * Financial operations patterns
+   */
+  financialAccess: {
+    // For managing loans
+    loans: combineAuthorization(
+      authorizeRoles(ROLES.ADMIN, ROLES.COOPERATIVE_ADMIN),
+      authorizePermissions({
+        any: [PERMISSIONS.ACCESS_LOAN_ELIGIBILITY]
+      })
+    ),
+    
+    // For managing contributions
+    contributions: combineAuthorization(
+      authorizeRoles(ROLES.ADMIN, ROLES.COOPERATIVE_ADMIN),
+      authorizePermissions({
+        any: [PERMISSIONS.ACCESS_MEMBER_BENEFITS]
+      })
+    ),
+    
+    // For managing payments
+    payments: combineAuthorization(
       authorizeRoles(ROLES.ADMIN),
       authorizePermissions({
-        all: [PERMISSIONS.APPROVE_PRODUCT, PERMISSIONS.REJECT_PRODUCT]
+        any: [PERMISSIONS.PAY_WITH_WALLET, PERMISSIONS.PAY_WITH_CARD]
       })
     )
   }

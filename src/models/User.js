@@ -20,14 +20,33 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6,
   },
+  phone: {
+    type: String,
+    trim: true,
+  },
   role: {
     type: String,
     enum: Object.values(ROLES),
-    default: ROLES.USER,
+    default: ROLES.BUYER,
   },
   permissions: [{
     type: String,
   }],
+  cooperativeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Cooperative',
+  },
+  dawId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+  },
+  walletBalance: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
   profilePicture: {
     type: String,
     default: '',
@@ -40,6 +59,61 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'inactive', 'suspended'],
     default: 'active',
+  },
+  userTier: {
+    type: String,
+    enum: ['freemium', 'premium', 'cooperative'],
+    default: 'freemium',
+  },
+  tierFeatures: {
+    maxProducts: {
+      type: Number,
+      default: function() {
+        switch(this.userTier) {
+          case 'freemium': return 5;
+          case 'premium': return 100;
+          case 'cooperative': return -1; // unlimited
+          default: return 5;
+        }
+      }
+    },
+    hasLoanAccess: {
+      type: Boolean,
+      default: function() {
+        return this.userTier === 'premium' || this.userTier === 'cooperative';
+      }
+    },
+    hasAnalytics: {
+      type: Boolean,
+      default: function() {
+        return this.userTier === 'premium' || this.userTier === 'cooperative';
+      }
+    },
+    hasBranding: {
+      type: Boolean,
+      default: function() {
+        return this.userTier === 'premium' || this.userTier === 'cooperative';
+      }
+    },
+    priorityHandling: {
+      type: Boolean,
+      default: function() {
+        return this.userTier === 'premium' || this.userTier === 'cooperative';
+      }
+    },
+    marketplaceDiscount: {
+      type: Number,
+      default: function() {
+        switch(this.userTier) {
+          case 'cooperative': return 10; // 10% discount
+          case 'premium': return 5; // 5% discount
+          default: return 0;
+        }
+      }
+    }
+  },
+  membershipUpgradeDate: {
+    type: Date,
   },
   lastLogin: {
     type: Date,
@@ -101,6 +175,65 @@ userSchema.methods.hasAllPermissions = function(permissions) {
 userSchema.methods.isActive = function() {
   return this.status === 'active';
 };
+
+// Method to upgrade user tier
+userSchema.methods.upgradeTier = function(newTier) {
+  if (['freemium', 'premium', 'cooperative'].includes(newTier)) {
+    this.userTier = newTier;
+    this.membershipUpgradeDate = new Date();
+    this.updateTierFeatures();
+  }
+};
+
+// Method to update tier features based on current tier
+userSchema.methods.updateTierFeatures = function() {
+  switch(this.userTier) {
+    case 'freemium':
+      this.tierFeatures = {
+        maxProducts: 5,
+        hasLoanAccess: false,
+        hasAnalytics: false,
+        hasBranding: false,
+        priorityHandling: false,
+        marketplaceDiscount: 0
+      };
+      break;
+    case 'premium':
+      this.tierFeatures = {
+        maxProducts: 100,
+        hasLoanAccess: true,
+        hasAnalytics: true,
+        hasBranding: true,
+        priorityHandling: true,
+        marketplaceDiscount: 5
+      };
+      break;
+    case 'cooperative':
+      this.tierFeatures = {
+        maxProducts: -1, // unlimited
+        hasLoanAccess: true,
+        hasAnalytics: true,
+        hasBranding: true,
+        priorityHandling: true,
+        marketplaceDiscount: 10
+      };
+      break;
+  }
+};
+
+// Method to check if user can add more products
+userSchema.methods.canAddProduct = function(currentProductCount) {
+  return this.tierFeatures.maxProducts === -1 || currentProductCount < this.tierFeatures.maxProducts;
+};
+
+// Auto-update tier when joining cooperative
+userSchema.pre('save', function(next) {
+  if (this.isModified('cooperativeId') && this.cooperativeId) {
+    this.userTier = 'cooperative';
+    this.updateTierFeatures();
+  }
+  next();
+});
 
 const User = mongoose.model('User', userSchema);
 

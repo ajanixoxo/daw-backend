@@ -12,8 +12,100 @@ const productSchema = new mongoose.Schema({
   },
   category: {
     type: String,
+    enum: [
+      'handcrafted-goods',
+      'agricultural-products', 
+      'fashion-beauty',
+      'digital-services',
+      'health-wellness',
+      'education-training'
+    ],
     required: true,
     trim: true,
+  },
+  subcategory: {
+    type: String,
+    trim: true,
+  },
+  marketplaceCategory: {
+    handcraftedGoods: {
+      subcategories: [
+        'jewelry',
+        'textiles',
+        'pottery',
+        'woodwork',
+        'leatherwork',
+        'beadwork',
+        'metalwork',
+        'basketry',
+        'other-crafts'
+      ]
+    },
+    agriculturalProducts: {
+      subcategories: [
+        'grains-cereals',
+        'fruits',
+        'vegetables',
+        'spices-herbs',
+        'dairy-products',
+        'poultry',
+        'processed-foods',
+        'organic-products',
+        'seeds-seedlings'
+      ]
+    },
+    fashionBeauty: {
+      subcategories: [
+        'traditional-wear',
+        'modern-fashion',
+        'accessories',
+        'skincare',
+        'cosmetics',
+        'hair-products',
+        'perfumes',
+        'nail-care',
+        'wellness-products'
+      ]
+    },
+    digitalServices: {
+      subcategories: [
+        'graphic-design',
+        'web-development',
+        'content-writing',
+        'digital-marketing',
+        'virtual-assistance',
+        'online-tutoring',
+        'consulting',
+        'photography',
+        'video-editing'
+      ]
+    },
+    healthWellness: {
+      subcategories: [
+        'herbal-medicine',
+        'fitness-products',
+        'nutritional-supplements',
+        'medical-devices',
+        'therapy-services',
+        'wellness-coaching',
+        'mental-health',
+        'traditional-healing',
+        'health-education'
+      ]
+    },
+    educationTraining: {
+      subcategories: [
+        'skill-development',
+        'business-training',
+        'technical-courses',
+        'language-learning',
+        'creative-arts',
+        'professional-development',
+        'entrepreneurship',
+        'financial-literacy',
+        'digital-literacy'
+      ]
+    }
   },
   price: {
     type: Number,
@@ -22,6 +114,34 @@ const productSchema = new mongoose.Schema({
   },
   imageUrl: {
     type: String,
+    required: true,
+  },
+  images: [{
+    url: {
+      type: String,
+      required: true,
+    },
+    alt: {
+      type: String,
+      trim: true,
+    },
+    isPrimary: {
+      type: Boolean,
+      default: false,
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  }],
+  storeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+  },
+  cooperativeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Cooperative',
     required: true,
   },
   sellerId: {
@@ -54,6 +174,12 @@ const productSchema = new mongoose.Schema({
     trim: true,
   }],
   // Stock/Inventory fields
+  stock: {
+    type: Number,
+    required: true,
+    default: 0,
+    min: 0,
+  },
   inventory: {
     type: Number,
     required: true,
@@ -229,6 +355,122 @@ productSchema.methods = {
       isOutOfStock: this.stockStatus === 'Out of Stock',
     };
   }
+};
+
+// Static methods for category management
+productSchema.statics.getMarketplaceCategories = function() {
+  return {
+    'handcrafted-goods': {
+      name: 'Handcrafted Goods',
+      description: 'Unique handmade items created by skilled artisans',
+      subcategories: [
+        'jewelry',
+        'textiles',
+        'pottery',
+        'woodwork',
+        'leatherwork',
+        'beadwork',
+        'metalwork',
+        'basketry',
+        'other-crafts'
+      ]
+    },
+    'agricultural-products': {
+      name: 'Agricultural Products',
+      description: 'Fresh produce and processed agricultural goods',
+      subcategories: [
+        'grains-cereals',
+        'fruits',
+        'vegetables',
+        'spices-herbs',
+        'dairy-products',
+        'poultry',
+        'processed-foods',
+        'organic-products',
+        'seeds-seedlings'
+      ]
+    },
+    'fashion-beauty': {
+      name: 'Fashion & Beauty',
+      description: 'Clothing, accessories, and beauty products',
+      subcategories: [
+        'traditional-wear',
+        'modern-fashion',
+        'accessories',
+        'skincare',
+        'cosmetics',
+        'hair-products',
+        'perfumes',
+        'nail-care',
+        'wellness-products'
+      ]
+    },
+    'digital-services': {
+      name: 'Digital Services',
+      description: 'Online services and digital products',
+      subcategories: [
+        'graphic-design',
+        'web-development',
+        'content-writing',
+        'digital-marketing',
+        'virtual-assistance',
+        'online-tutoring',
+        'consulting',
+        'photography',
+        'video-editing'
+      ]
+    },
+    'health-wellness': {
+      name: 'Health & Wellness',
+      description: 'Products and services for health and wellbeing',
+      subcategories: [
+        'herbal-medicine',
+        'fitness-products',
+        'nutritional-supplements',
+        'medical-devices',
+        'therapy-services',
+        'wellness-coaching',
+        'mental-health',
+        'traditional-healing',
+        'health-education'
+      ]
+    },
+    'education-training': {
+      name: 'Education & Training',
+      description: 'Educational content and training programs',
+      subcategories: [
+        'skill-development',
+        'business-training',
+        'technical-courses',
+        'language-learning',
+        'creative-arts',
+        'professional-development',
+        'entrepreneurship',
+        'financial-literacy',
+        'digital-literacy'
+      ]
+    }
+  };
+};
+
+productSchema.statics.getCategorySubcategories = function(category) {
+  const categories = this.getMarketplaceCategories();
+  return categories[category]?.subcategories || [];
+};
+
+productSchema.statics.validateCategoryAndSubcategory = function(category, subcategory) {
+  const categories = this.getMarketplaceCategories();
+  const categoryData = categories[category];
+  
+  if (!categoryData) {
+    return { valid: false, error: 'Invalid category' };
+  }
+  
+  if (subcategory && !categoryData.subcategories.includes(subcategory)) {
+    return { valid: false, error: 'Invalid subcategory for the selected category' };
+  }
+  
+  return { valid: true };
 };
 
 const Product = mongoose.model('Product', productSchema);
