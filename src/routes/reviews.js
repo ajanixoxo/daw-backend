@@ -56,19 +56,19 @@ router.post('/',
       if (productId) {
         entity = await Product.findById(productId);
         entityType = 'product';
-        if (!entity || !entity.isVisibleToBuyers()) {
+        if (!entity) {
           return res.status(404).json({ message: 'Product not found or not available' });
         }
       } else if (storeId) {
         entity = await Store.findById(storeId);
         entityType = 'store';
-        if (!entity || !entity.isActiveAndVerified()) {
+        if (!entity) {
           return res.status(404).json({ message: 'Store not found or not available' });
         }
       } else if (cooperativeId) {
         entity = await Cooperative.findById(cooperativeId);
         entityType = 'cooperative';
-        if (!entity || !entity.isActiveAndVerified()) {
+        if (!entity) {
           return res.status(404).json({ message: 'Cooperative not found or not available' });
         }
       }
@@ -257,264 +257,103 @@ router.get('/cooperative/:cooperativeId', async (req, res) => {
   }
 });
 
-// Mark review as helpful
-router.post('/:id/helpful', 
-  auth, 
-  async (req, res) => {
-    try {
-      const reviewId = req.params.id;
-      const review = await Review.findById(reviewId);
 
-      if (!review) {
-        return res.status(404).json({ message: 'Review not found' });
-      }
 
-      if (!review.isVisible()) {
-        return res.status(404).json({ message: 'Review not found' });
-      }
 
-      await review.markHelpful(req.user._id);
-
-      res.json({
-        message: 'Review marked as helpful',
-        helpfulCount: review.helpful.count,
-      });
-    } catch (error) {
-      res.status(500).json({ 
-        message: 'Error marking review as helpful', 
-        error: error.message 
-      });
-    }
-  }
-);
-
-// Remove helpful mark
-router.delete('/:id/helpful', 
-  auth, 
-  async (req, res) => {
-    try {
-      const reviewId = req.params.id;
-      const review = await Review.findById(reviewId);
-
-      if (!review) {
-        return res.status(404).json({ message: 'Review not found' });
-      }
-
-      if (!review.isVisible()) {
-        return res.status(404).json({ message: 'Review not found' });
-      }
-
-      await review.removeHelpful(req.user._id);
-
-      res.json({
-        message: 'Helpful mark removed',
-        helpfulCount: review.helpful.count,
-      });
-    } catch (error) {
-      res.status(500).json({ 
-        message: 'Error removing helpful mark', 
-        error: error.message 
-      });
-    }
-  }
-);
-
-// Flag review
-router.post('/:id/flag', 
-  auth, 
-  [
-    body('reason').isIn(['inappropriate', 'spam', 'fake', 'offensive', 'other'])
-      .withMessage('Valid flag reason is required'),
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { reason } = req.body;
-      const reviewId = req.params.id;
-      const review = await Review.findById(reviewId);
-
-      if (!review) {
-        return res.status(404).json({ message: 'Review not found' });
-      }
-
-      if (!review.isVisible()) {
-        return res.status(404).json({ message: 'Review not found' });
-      }
-
-      // Check if user has already flagged this review
-      const existingFlag = review.moderation.flags.find(
-        flag => flag.reportedBy.toString() === req.user._id.toString()
-      );
-
-      if (existingFlag) {
-        return res.status(400).json({ 
-          message: 'You have already flagged this review' 
-        });
-      }
-
-      await review.flagReview(reason, req.user._id);
-
-      res.json({
-        message: 'Review flagged successfully',
-        flagCount: review.moderation.flags.length,
-      });
-    } catch (error) {
-      res.status(500).json({ 
-        message: 'Error flagging review', 
-        error: error.message 
-      });
-    }
-  }
-);
-
-// Get pending reviews for moderation (Admin + Coop Admin)
-router.get('/moderation/pending', 
-  auth, 
-  authorizeRoles(ROLES.ADMIN, ROLES.COOPERATIVE_ADMIN),
-  async (req, res) => {
-    try {
-      const { page = 1, limit = 50, type } = req.query;
-
-      let options = {};
-      if (type) options.type = type;
-
-      const reviews = await Review.getPendingReviews({
-        page: parseInt(page),
-        limit: parseInt(limit),
-        ...options,
-      });
-
-      res.json({
-        reviews,
-        pagination: {
-          totalPages: Math.ceil(reviews.length / limit),
-          currentPage: parseInt(page),
-          total: reviews.length,
-        },
-      });
-    } catch (error) {
-      res.status(500).json({ 
-        message: 'Error fetching pending reviews', 
-        error: error.message 
-      });
-    }
-  }
-);
-
-// Approve/Reject review (Admin + Coop Admin)
-router.patch('/:id/moderate', 
-  auth, 
-  authorizeRoles(ROLES.ADMIN, ROLES.COOPERATIVE_ADMIN),
-  [
-    body('status').isIn(['approved', 'rejected', 'hidden']).withMessage('Valid status is required'),
-    body('moderationNotes').optional().trim(),
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { status, moderationNotes } = req.body;
-      const reviewId = req.params.id;
-      const review = await Review.findById(reviewId);
-
-      if (!review) {
-        return res.status(404).json({ message: 'Review not found' });
-      }
-
-      if (!review.isPendingModeration()) {
-        return res.status(400).json({ 
-          message: 'Only pending reviews can be moderated' 
-        });
-      }
-
-      // Update review status
-      review.status = status;
-      review.moderation = {
-        ...review.moderation,
-        moderatedBy: req.user._id,
-        moderatedAt: new Date(),
-        moderationNotes: moderationNotes || '',
-      };
-      review.updatedAt = new Date();
-
-      await review.save();
-
-      res.json({
-        message: `Review ${status} successfully`,
-        review: review.getSummary(),
-        moderation: review.moderation,
-      });
-    } catch (error) {
-      res.status(500).json({ 
-        message: 'Error moderating review', 
-        error: error.message 
-      });
-    }
-  }
-);
-
-// Get user's reviews (User(Self) + Admin)
-router.get('/user/:userId', 
+// Delete review (Buyer - own reviews only, Admin - any review)
+router.delete('/:id', 
   auth, 
   authorizeRoles(ROLES.BUYER, ROLES.ADMIN),
   async (req, res) => {
     try {
-      const { userId } = req.params;
-      const { page = 1, limit = 20, status, type } = req.query;
+      const reviewId = req.params.id;
 
-      // Check if user has access to these reviews
-      if (req.user.role === ROLES.BUYER) {
-        if (userId !== req.user._id.toString()) {
-          return res.status(403).json({ 
-            message: 'You can only view your own reviews' 
-          });
-        }
+      // Find review
+      const review = await Review.findById(reviewId);
+      if (!review) {
+        return res.status(404).json({ message: 'Review not found' });
       }
 
-      // Check if user exists
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
+      // Check permissions
+      const isOwner = review.buyerId.toString() === req.user._id.toString();
+      const isAdmin = req.user.role === ROLES.ADMIN;
+
+      if (!isOwner && !isAdmin) {
+        return res.status(403).json({ 
+          message: 'You can only delete your own reviews' 
+        });
       }
 
-      // Build query
-      const query = { buyerId: userId };
-      if (status) query.status = status;
-      if (type) query.type = type;
+      // Store review info for response
+      const reviewSummary = review.getSummary();
 
-      const reviews = await Review.find(query)
-        .populate('productId', 'title')
-        .populate('storeId', 'name')
-        .populate('cooperativeId', 'name')
-        .limit(limit * 1)
-        .skip((page - 1) * limit)
-        .sort({ createdAt: -1 });
-
-      const total = await Review.countDocuments(query);
+      // Delete the review
+      await Review.findByIdAndDelete(reviewId);
 
       res.json({
-        userId,
-        reviews: reviews.map(r => r.getSummary()),
-        pagination: {
-          totalPages: Math.ceil(total / limit),
-          currentPage: parseInt(page),
-          total,
-        },
+        message: 'Review deleted successfully',
+        deletedReview: reviewSummary,
       });
     } catch (error) {
       res.status(500).json({ 
-        message: 'Error fetching user reviews', 
+        message: 'Error deleting review', 
         error: error.message 
       });
     }
   }
 );
+
+// Get review by ID (public for approved reviews)
+router.get('/:id', 
+  async (req, res) => {
+    try {
+      const reviewId = req.params.id;
+
+      const review = await Review.findById(reviewId)
+        .populate('buyerId', 'name profilePicture')
+        .populate('productId', 'title imageUrl')
+        .populate('storeId', 'name')
+        .populate('cooperativeId', 'name');
+
+      if (!review) {
+        return res.status(404).json({ message: 'Review not found' });
+      }
+
+      // Only show approved reviews to public, unless user is owner or admin
+      if (review.status !== 'approved') {
+        // Check if user is authenticated and is owner or admin
+        if (!req.user) {
+          return res.status(404).json({ message: 'Review not found' });
+        }
+
+        const isOwner = review.buyerId._id.toString() === req.user._id.toString();
+        const isAdmin = req.user.role === ROLES.ADMIN;
+
+        if (!isOwner && !isAdmin) {
+          return res.status(404).json({ message: 'Review not found' });
+        }
+      }
+
+      res.json({
+        review: {
+          ...review.getSummary(),
+          buyer: review.buyerId,
+          product: review.productId,
+          store: review.storeId,
+          cooperative: review.cooperativeId,
+          images: review.images,
+          verification: review.verification,
+        },
+        message: 'Review retrieved successfully'
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        message: 'Error fetching review', 
+        error: error.message 
+      });
+    }
+  }
+);
+
 
 module.exports = router;

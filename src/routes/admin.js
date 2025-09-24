@@ -8,6 +8,7 @@ const User = require('../models/User');
 const Store = require('../models/Store');
 const Product = require('../models/Product');
 const Cooperative = require('../models/Cooperative');
+const Membership = require('../models/Membership');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
 const Loan = require('../models/Loan');

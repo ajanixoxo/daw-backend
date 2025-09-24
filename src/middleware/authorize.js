@@ -129,7 +129,7 @@ const authorizeOwnership = (options = {}) => {
     }
 
     const resourceId = req.params[resourceField] || req.body[resourceField];
-    
+    console.log(resourceId, req.user._id);
     if (!resourceId || resourceId.toString() !== req.user._id.toString()) {
       return res.status(403).json({ 
         message: 'You do not have permission to access this resource' 

@@ -1,6 +1,7 @@
 const express = require('express');
 const stripeService = require('../services/stripe');
 const Payment = require('../models/Payment');
+const PaymentLink = require('../models/PaymentLink');
 const User = require('../models/User');
 const Order = require('../models/Order');
 
@@ -18,6 +19,10 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
 
     // Handle the event
     switch (event.type) {
+      case 'checkout.session.completed':
+        await handleCheckoutSessionCompleted(event.data.object);
+        break;
+
       case 'payment_intent.succeeded':
         await handlePaymentIntentSucceeded(event.data.object);
         break;
@@ -65,6 +70,80 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
   }
 });
 
+// Handle completed checkout session (for Payment Links)
+async function handleCheckoutSessionCompleted(session) {
+  try {
+    console.log(`Checkout session completed: ${session.id}`);
+
+    // Find payment link by metadata
+    const paymentLink = await PaymentLink.findOne({
+      'metadata.secureCode': session.metadata?.secureCode
+    });
+
+    if (!paymentLink) {
+      console.error(`Payment link not found for session: ${session.id}`);
+      return;
+    }
+
+    // Update related order if exists
+    if (paymentLink.relatedModel === 'Order' && paymentLink.relatedId) {
+      const order = await Order.findById(paymentLink.relatedId);
+      if (order) {
+        if (session.payment_status === 'paid') {
+          order.status = 'confirmed';
+          order.paymentStatus = 'succeeded';
+          order.stripePaymentIntentId = session.payment_intent;
+        } else {
+          order.status = 'failed';
+          order.paymentStatus = 'failed';
+        }
+        await order.save();
+        console.log(`Order ${order._id} updated to ${order.status}`);
+      }
+    }
+
+    // Create or update payment record
+    let payment = await Payment.findOne({ 
+      stripePaymentIntentId: session.payment_intent 
+    });
+
+    if (!payment) {
+      payment = new Payment({
+        userId: paymentLink.userId,
+        stripePaymentIntentId: session.payment_intent,
+        stripeCustomerId: session.customer,
+        amount: paymentLink.amount,
+        currency: paymentLink.currency,
+        status: session.payment_status === 'paid' ? 'succeeded' : 'failed',
+        paymentType: paymentLink.paymentType,
+        relatedId: paymentLink.relatedId,
+        relatedModel: paymentLink.relatedModel,
+        description: `Payment via link for ${paymentLink.paymentType}`,
+      });
+    } else {
+      payment.status = session.payment_status === 'paid' ? 'succeeded' : 'failed';
+    }
+
+    await payment.save();
+
+    // Mark payment link as completed
+    if (session.payment_status === 'paid') {
+      paymentLink.markCompleted(session.id, {
+        email: session.customer_details?.email,
+        name: session.customer_details?.name,
+      });
+      await paymentLink.save();
+      
+      // Handle post-payment actions
+      await handleSuccessfulPayment(payment);
+    }
+
+    console.log(`Payment processed: ${payment._id}`);
+  } catch (error) {
+    console.error('Error handling checkout session completed:', error);
+  }
+}
+
 // Handle successful payment intent
 async function handlePaymentIntentSucceeded(paymentIntent) {
   try {
@@ -95,6 +174,18 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
     }
 
     await payment.save();
+
+    // Update related order if exists
+    if (payment.relatedModel === 'Order' && payment.relatedId) {
+      const order = await Order.findById(payment.relatedId);
+      if (order) {
+        order.status = 'confirmed';
+        order.paymentStatus = 'succeeded';
+        order.paymentId = payment._id;
+        await order.save();
+        console.log(`Order ${order._id} confirmed via payment intent`);
+      }
+    }
 
     // Handle post-payment actions
     await handleSuccessfulPayment(payment);
@@ -129,6 +220,18 @@ async function handlePaymentIntentFailed(paymentIntent) {
 
     await payment.save();
 
+    // Update related order if exists
+    if (payment.relatedModel === 'Order' && payment.relatedId) {
+      const order = await Order.findById(payment.relatedId);
+      if (order) {
+        order.status = 'failed';
+        order.paymentStatus = 'failed';
+        order.paymentId = payment._id;
+        await order.save();
+        console.log(`Order ${order._id} failed via payment intent`);
+      }
+    }
+
     console.log(`Payment failed: ${payment._id}`);
   } catch (error) {
     console.error('Error handling payment intent failed:', error);
@@ -149,6 +252,18 @@ async function handlePaymentIntentCanceled(paymentIntent) {
 
     payment.status = 'canceled';
     await payment.save();
+
+    // Update related order if exists
+    if (payment.relatedModel === 'Order' && payment.relatedId) {
+      const order = await Order.findById(payment.relatedId);
+      if (order) {
+        order.status = 'cancelled';
+        order.paymentStatus = 'canceled';
+        order.paymentId = payment._id;
+        await order.save();
+        console.log(`Order ${order._id} canceled via payment intent`);
+      }
+    }
 
     console.log(`Payment canceled: ${payment._id}`);
   } catch (error) {
@@ -252,17 +367,17 @@ async function handleSuccessfulPayment(payment) {
         console.log(`Wallet topped up: User ${payment.userId}, Amount: ${payment.amount}`);
         break;
         
+      case 'product':
       case 'order':
-        // Update order status to processing
+        // Order should already be updated to 'confirmed' by the webhook handler
+        // Move to processing if confirmed
         if (payment.relatedId) {
-          await Order.findByIdAndUpdate(
-            payment.relatedId,
-            { 
-              status: 'processing',
-              updatedAt: new Date()
-            }
-          );
-          console.log(`Order updated to processing: ${payment.relatedId}`);
+          const order = await Order.findById(payment.relatedId);
+          if (order && order.status === 'confirmed') {
+            order.status = 'processing';
+            await order.save();
+            console.log(`Order moved to processing: ${payment.relatedId}`);
+          }
         }
         break;
         

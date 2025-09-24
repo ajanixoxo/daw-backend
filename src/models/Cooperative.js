@@ -1,6 +1,13 @@
 const mongoose = require('mongoose');
 
 const cooperativeSchema = new mongoose.Schema({
+  cooperative_id: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    // Auto-generated cooperative ID that can be used as foreign key
+  },
   name: {
     type: String,
     required: true,
@@ -276,13 +283,22 @@ const cooperativeSchema = new mongoose.Schema({
   },
 });
 
-// Update timestamp on save
+// Auto-generate cooperative_id and update timestamp on save
 cooperativeSchema.pre('save', function(next) {
+  // Generate cooperative_id if not provided
+  if (!this.cooperative_id) {
+    // Generate a unique cooperative ID (COOP-YYYY-XXXXX format)
+    const year = new Date().getFullYear();
+    const randomNum = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
+    this.cooperative_id = `COOP-${year}-${randomNum}`;
+  }
+  
   this.updatedAt = Date.now();
   next();
 });
 
 // Indexes for better query performance
+cooperativeSchema.index({ cooperative_id: 1 }, { unique: true }); // Unique index for cooperative_id
 cooperativeSchema.index({ name: 1 }); // Note: NOT unique to allow similar names
 cooperativeSchema.index({ adminId: 1 });
 cooperativeSchema.index({ status: 1 });
@@ -304,6 +320,7 @@ cooperativeSchema.index({
 cooperativeSchema.methods.getSummary = function() {
   return {
     _id: this._id,
+    cooperative_id: this.cooperative_id,
     name: this.name,
     description: this.description,
     adminId: this.adminId,
@@ -313,6 +330,8 @@ cooperativeSchema.methods.getSummary = function() {
     contactInfo: this.contactInfo,
     membership: this.membership,
     stats: this.stats,
+    imageUrl: this.imageUrl,
+    images: this.images,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
   };

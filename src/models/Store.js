@@ -9,7 +9,7 @@ const storeSchema = new mongoose.Schema({
   cooperativeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Cooperative',
-    required: true,
+    required: false,
   },
   name: {
     type: String,

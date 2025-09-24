@@ -146,6 +146,53 @@ router.post('/confirm', auth, [
   }
 });
 
+// GET /api/payments - Get all payments (Admin only) or user's payments
+router.get('/', auth, async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, paymentType, userId } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    let filter = {};
+    
+    // If not admin, only show user's own payments
+    if (req.user.role !== 'admin') {
+      filter.userId = req.user._id;
+    } else {
+      // Admin can filter by specific user if provided
+      if (userId) filter.userId = userId;
+    }
+    
+    if (status) filter.status = status;
+    if (paymentType) filter.paymentType = paymentType;
+
+    const payments = await Payment.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate('userId', 'name email role')
+      .populate('relatedId');
+
+    const total = await Payment.countDocuments(filter);
+
+    res.json({
+      payments,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalPayments: total,
+        limit: parseInt(limit),
+      },
+      message: req.user.role === 'admin' ? 'All payments retrieved successfully' : 'User payments retrieved successfully'
+    });
+  } catch (error) {
+    console.error('Get payments error:', error);
+    res.status(500).json({ 
+      message: 'Failed to retrieve payments', 
+      error: error.message 
+    });
+  }
+});
+
 // GET /api/payments/my - Get user's payments
 router.get('/my', auth, async (req, res) => {
   try {
@@ -269,6 +316,75 @@ router.post('/:id/refund', auth, [
     console.error('Refund error:', error);
     res.status(500).json({ 
       message: 'Failed to process refund', 
+      error: error.message 
+    });
+  }
+});
+
+// GET /api/payments/admin/all - Get all payments (Admin only, no restrictions)
+router.get('/admin/all', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admin role required.' });
+    }
+
+    const { page = 1, limit = 10, status, paymentType, userId, startDate, endDate, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    let filter = {};
+    
+    if (status) filter.status = status;
+    if (paymentType) filter.paymentType = paymentType;
+    if (userId) filter.userId = userId;
+    
+    // Date range filter
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) filter.createdAt.$lte = new Date(endDate);
+    }
+
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    const payments = await Payment.find(filter)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate('userId', 'name email role phone')
+      .populate('relatedId');
+
+    const total = await Payment.countDocuments(filter);
+
+    // Calculate summary statistics
+    const totalAmount = await Payment.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+
+    const statusCounts = await Payment.aggregate([
+      { $match: filter },
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+
+    res.json({
+      payments,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalPayments: total,
+        limit: parseInt(limit),
+      },
+      summary: {
+        totalAmount: totalAmount.length > 0 ? totalAmount[0].total : 0,
+        statusBreakdown: statusCounts,
+      },
+      message: 'All payments retrieved successfully'
+    });
+  } catch (error) {
+    console.error('Get all payments error:', error);
+    res.status(500).json({ 
+      message: 'Failed to retrieve all payments', 
       error: error.message 
     });
   }

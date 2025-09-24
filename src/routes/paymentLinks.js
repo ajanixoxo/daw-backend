@@ -4,7 +4,9 @@ const auth = require('../middleware/auth');
 const stripeService = require('../services/stripe');
 const PaymentLink = require('../models/PaymentLink');
 const Payment = require('../models/Payment');
+const Order = require('../models/Order');
 const User = require('../models/User');
+const Cart = require('../models/Cart');
 const crypto = require('crypto');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -15,11 +17,15 @@ const validatePaymentLinkCreation = [
   param('user_id').isMongoId().withMessage('Invalid user ID'),
   body('amount').isFloat({ min: 0.5 }).withMessage('Amount must be at least $0.50'),
   body('currency').optional().isIn(['usd', 'eur', 'gbp']).withMessage('Invalid currency'),
-  body('paymentType').isIn(['subscription', 'one_time', 'donation', 'membership', 'product']).withMessage('Invalid payment type'),
+  body('paymentType').isIn(['subscription', 'one_time', 'donation', 'membership', 'product', 'cart']).withMessage('Invalid payment type'),
   body('productId').optional().notEmpty().withMessage('Product ID is required for product payments'),
   body('description').optional().isLength({ max: 500 }).withMessage('Description too long'),
   body('relatedId').optional().isMongoId().withMessage('Invalid related ID'),
-  body('relatedModel').optional().isIn(['Product', 'Subscription', 'Masterclass', 'Membership']).withMessage('Invalid related model'),
+  body('relatedModel').optional().isIn(['Product', 'Subscription', 'Masterclass', 'Membership', 'Order']).withMessage('Invalid related model'),
+  body('products').optional().isArray().withMessage('Products must be an array'),
+  body('products.*.productId').optional().isMongoId().withMessage('Invalid product ID'),
+  body('products.*.quantity').optional().isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
+  body('products.*.price').optional().isFloat({ min: 0 }).withMessage('Price must be non-negative'),
 ];
 
 const validatePaymentSuccess = [
@@ -50,6 +56,7 @@ router.post('/:user_id/create-payment', auth, validatePaymentLinkCreation, async
       description,
       relatedId,
       relatedModel,
+      products = [],
       metadata = {}
     } = req.body;
 
@@ -109,7 +116,7 @@ router.post('/:user_id/create-payment', auth, validatePaymentLinkCreation, async
       after_completion: {
         type: 'redirect',
         redirect: {
-          url: `${'http://localhost:3001'}/api/payment-links/${user_id}/payment-success?secureCode=${secureCode}`,
+          url: `${'http://localhost:3001'}/api/payment-links/${user_id}/payment-success?secureCode=${secureCode}&session_id={CHECKOUT_SESSION_ID}`,
         },
       },
       metadata: {
@@ -151,6 +158,62 @@ router.post('/:user_id/create-payment', auth, validatePaymentLinkCreation, async
 
     await paymentLink.save();
 
+    // Create draft order with PENDING_PAYMENT status
+    let order = null;
+    console.log(paymentType, "Hello World",products);
+    if (paymentType === 'product' && products.length > 0) {
+      console.log("Saving Order");
+      order = new Order({
+        userId: user_id,
+        products: products.map(product => ({
+          productId: product.productId,
+          quantity: product.quantity,
+          price: product.price
+        })),
+        totalAmount: amount,
+        status: 'pending_payment',
+        paymentStatus: 'pending',
+        paymentLinkId: paymentLink._id,
+      });
+      await order.save();
+
+      // Add order reference to payment link
+      paymentLink.relatedId = order._id;
+      paymentLink.relatedModel = 'Order';
+      await paymentLink.save();
+    } else if (paymentType === 'cart') {
+      console.log("Processing Cart Payment");
+      
+      // Find user's cart
+      const cart = await Cart.findOne({ userId: user_id }).populate('products.productId');
+      if (!cart || cart.products.length === 0) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Cart is empty or not found' 
+        });
+      }
+
+      // Create order from cart items
+      order = new Order({
+        userId: user_id,
+        products: cart.products.map(cartItem => ({
+          productId: cartItem.productId._id,
+          quantity: cartItem.quantity,
+          price: cartItem.productId.price
+        })),
+        totalAmount: amount,
+        status: 'pending_payment',
+        paymentStatus: 'pending',
+        paymentLinkId: paymentLink._id,
+      });
+      await order.save();
+
+      // Add order reference to payment link
+      paymentLink.relatedId = order._id;
+      paymentLink.relatedModel = 'Order';
+      await paymentLink.save();
+    }
+
     res.json({
       success: true,
       message: 'Payment link created successfully',
@@ -159,6 +222,8 @@ router.post('/:user_id/create-payment', auth, validatePaymentLinkCreation, async
         secureCode,
         expiresAt: paymentLink.expiresAt,
         paymentLinkId: paymentLink._id,
+        orderId: order ? order._id : null,
+        orderStatus: order ? order.status : null,
       },
     });
 
@@ -186,6 +251,8 @@ router.get('/:user_id/payment-success', validatePaymentSuccess, async (req, res)
 
     const { user_id } = req.params;
     const { secureCode, session_id } = req.query;
+
+    console.log(`Processing Cart Payment - Secure Code: ${secureCode}, Session ID: ${session_id || 'NOT PROVIDED'}`);
 
     // Verify user exists
     const user = await User.findById(user_id);
@@ -222,7 +289,7 @@ router.get('/:user_id/payment-success', validatePaymentSuccess, async (req, res)
     }
 
     // If session_id is provided, verify the payment with Stripe
-    if (session_id) {
+    if (session_id && session_id !== 'undefined') {
       try {
         // Retrieve the checkout session from Stripe
         const session = await stripe.checkout.sessions.retrieve(session_id);
@@ -252,21 +319,85 @@ router.get('/:user_id/payment-success', validatePaymentSuccess, async (req, res)
 
           await payment.save();
 
+          console.log(payment, "Payment");
+          console.log(paymentLink, "Payment Link");
+
+          // Update order status if exists
+          if (paymentLink.relatedModel === 'Order' && paymentLink.relatedId) {
+            const order = await Order.findById(paymentLink.relatedId);
+            if (order) {
+              order.status = 'confirmed';
+              order.paymentStatus = 'succeeded';
+              order.paymentId = payment._id;
+              order.stripePaymentIntentId = session.payment_intent;
+              await order.save();
+
+              // Clear cart if this was a cart payment
+              if (paymentLink.paymentType === 'cart') {
+                const cart = await Cart.findOne({ userId: user_id });
+                if (cart) {
+                  cart.products = [];
+                  await cart.save();
+                  console.log(`Cart cleared for user ${user_id} after successful payment`);
+                }
+              }
+            }
+          }
+
           // Handle post-payment actions
           await handleSuccessfulPayment(payment, paymentLink);
         //   res.redirect("https://fornt_uyrl/succe")
 
-          return res.json({
-            success: true,
-            message: 'Payment completed successfully',
-            data: {
-              paymentId: payment._id,
-              amount: payment.amount,
-              currency: payment.currency,
-              status: payment.status,
-              completedAt: paymentLink.completedAt,
-            },
-          });
+          // Return redirect page with timer instead of JSON
+          const redirectPageTemplate = `<!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Payment Successful - Redirecting...</title>
+              <style>
+                  body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f0f8ff; }
+                  .success { color: #28a745; font-size: 24px; margin-bottom: 20px; }
+                  .countdown { color: #007bff; font-size: 18px; margin: 20px 0; }
+                  button { padding: 10px 20px; margin: 10px; cursor: pointer; }
+                  .cancel-btn { background-color: #dc3545; color: white; border: none; border-radius: 5px; }
+              </style>
+          </head>
+          <body>
+              <div>
+                  <h1 class="success">✅ Payment Successful!</h1>
+                  <p>Your payment of $${payment.amount} ${payment.currency} has been processed successfully.</p>
+                  <p class="countdown">Redirecting to your account in <span id="countdown">5</span> seconds...</p>
+                  <button class="cancel-btn" onclick="cancelRedirect()">Cancel Redirect</button>
+              </div>
+          
+              <script>
+                  let timeLeft = 5;
+                  let redirectUrl = 'http://localhost:4028/checkout';
+                  let countdownInterval;
+                  let redirectCanceled = false; 
+          
+                  function updateCountdown() {
+                      document.getElementById('countdown').textContent = timeLeft;
+                      if (timeLeft <= 0 && !redirectCanceled) {
+                          window.location.href = redirectUrl;
+                      }
+                      timeLeft--;
+                  }
+          
+                  function cancelRedirect() {
+                      redirectCanceled = true;
+                      clearInterval(countdownInterval);
+                      document.querySelector('.countdown').innerHTML = 'Redirect canceled. <a href="' + redirectUrl + '">Click here to continue</a>';
+                  }
+          
+                  countdownInterval = setInterval(updateCountdown, 1000);
+                  updateCountdown(); // Initial call
+              </script>
+          </body>
+          </html>`;
+          
+          return res.send(redirectPageTemplate);
         } else {
           return res.status(400).json({ 
             success: false,
@@ -282,6 +413,7 @@ router.get('/:user_id/payment-success', validatePaymentSuccess, async (req, res)
       }
     } else {
       // If no session_id, just mark as completed (less secure, for backward compatibility)
+      console.warn(`WARNING: Processing payment without session_id verification for secureCode: ${secureCode}. This is less secure.`);
       paymentLink.markCompleted();
       await paymentLink.save();
       const redirectPageTemplate = `<!DOCTYPE html>
@@ -289,17 +421,25 @@ router.get('/:user_id/payment-success', validatePaymentSuccess, async (req, res)
       <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Redirecting...</title>
+          <title>Payment Processed - Redirecting...</title>
+          <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #fff3cd; }
+              .warning { color: #856404; font-size: 24px; margin-bottom: 20px; }
+              .countdown { color: #007bff; font-size: 18px; margin: 20px 0; }
+              button { padding: 10px 20px; margin: 10px; cursor: pointer; }
+              .cancel-btn { background-color: #dc3545; color: white; border: none; border-radius: 5px; }
+          </style>
       </head>
       <body>
           <div>
-              <h1>You will be redirected in <span id="countdown">5</span> seconds</h1>
-              <p>Please wait while we redirect you to your destination.</p>
-              <button onclick="cancelRedirect()">Cancel</button>
+              <h1 class="warning">⚠️ Payment Processed</h1>
+              <p>Your payment has been processed (without full verification).</p>
+              <p class="countdown">Redirecting to your account in <span id="countdown">5</span> seconds...</p>
+              <button class="cancel-btn" onclick="cancelRedirect()">Cancel Redirect</button>
           </div>
       
           <script>
-              let timeLeft = 1;
+              let timeLeft = 5;
               let redirectUrl = 'http://localhost:4028/checkout';
               let countdownInterval;
               let redirectCanceled = false; 
@@ -321,7 +461,7 @@ router.get('/:user_id/payment-success', validatePaymentSuccess, async (req, res)
               function cancelRedirect() {
                   redirectCanceled = true;
                   clearInterval(countdownInterval);
-                  document.body.innerHTML = '<h1>Redirect Canceled</h1><p>The automatic redirect has been canceled.</p>';
+                  document.querySelector('.countdown').innerHTML = 'Redirect canceled. <a href="' + redirectUrl + '">Click here to continue</a>';
               }
       
               window.onload = startCountdown;
@@ -511,6 +651,11 @@ async function handleSuccessfulPayment(payment, paymentLink) {
       case 'product':
         // Handle product purchase
         console.log(`Product purchase completed: ${payment.relatedId}`);
+        break;
+        
+      case 'cart':
+        // Handle cart purchase
+        console.log(`Cart purchase completed: ${payment.relatedId}`);
         break;
         
       case 'subscription':

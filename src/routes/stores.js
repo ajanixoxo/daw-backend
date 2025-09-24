@@ -14,7 +14,7 @@ const router = express.Router();
 const validateStore = [
   body('name').trim().notEmpty().withMessage('Store name is required'),
   body('description').trim().notEmpty().withMessage('Description is required'),
-  body('cooperativeId').isMongoId().withMessage('Valid cooperative ID is required'),
+  body('cooperativeId').optional().isMongoId().withMessage('Valid cooperative ID is required'),
   body('imageUrl').optional().trim().isURL().withMessage('Invalid image URL format'),
   body('contactInfo.phone').optional().trim(),
   body('contactInfo.email').optional().isEmail().withMessage('Invalid email format'),
@@ -59,39 +59,35 @@ router.post('/',
 
       const { cooperativeId } = req.body;
 
-      // Check if cooperative exists and is active
-      const cooperative = await Cooperative.findById(cooperativeId);
-      if (!cooperative) {
-        return res.status(404).json({ message: 'Cooperative not found' });
-      }
+      // Check if cooperative exists and is active (if cooperativeId provided)
+      if (cooperativeId) {
+        const cooperative = await Cooperative.findById(cooperativeId);
+        if (!cooperative) {
+          return res.status(404).json({ message: 'Cooperative not found' });
+        }
 
-      if (!cooperative.isActiveAndVerified()) {
-        return res.status(400).json({ 
-          message: 'Cooperative must be active and verified' 
+        if (!cooperative.isActiveAndVerified()) {
+          return res.status(400).json({ 
+            message: 'Cooperative must be active and verified' 
+          });
+        }
+
+        // Optional: Check if user is a member of the cooperative (now just for validation, not blocking)
+        const Membership = require('../models/Membership');
+        const membership = await Membership.findOne({
+          cooperativeId,
+          userId: req.user._id,
+          status: 'active',
         });
+
+        // Note: Membership is no longer required, but we can track it for analytics
+        if (!membership) {
+          console.log(`User ${req.user._id} is creating a store without cooperative membership`);
+        }
       }
 
-      // Check if user is a member of the cooperative
-      const Membership = require('../models/Membership');
-      const membership = await Membership.findOne({
-        cooperativeId,
-        userId: req.user._id,
-        status: 'active',
-      });
-
-      if (!membership) {
-        return res.status(403).json({ 
-          message: 'You must be a member of the cooperative to create a store' 
-        });
-      }
-
-      // Check if user already has a store
-      const existingStore = await Store.findOne({ sellerId: req.user._id });
-      if (existingStore) {
-        return res.status(400).json({ 
-          message: 'You already have a store' 
-        });
-      }
+      // Users can now create multiple stores
+      // Removed restriction: sellers can have multiple stores for different purposes
 
       // Process uploaded images
       const uploadedFiles = processUploadedFiles(req);
@@ -344,6 +340,61 @@ router.delete('/:id',
     } catch (error) {
       res.status(500).json({ 
         message: 'Error suspending store', 
+        error: error.message 
+      });
+    }
+  }
+);
+
+// Get seller's own stores (multiple stores support)
+router.get('/seller/my-stores', 
+  auth, 
+  authorizeRoles(ROLES.SELLER),
+  async (req, res) => {
+    try {
+      const { page = 1, limit = 10, status, category } = req.query;
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+
+      // Build query for seller's stores
+      const query = { sellerId: req.user._id };
+      if (status) query.status = status;
+      if (category) query.categories = { $in: [category] };
+
+      const stores = await Store.find(query)
+        .populate('cooperativeId', 'name status verificationStatus')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+
+      const total = await Store.countDocuments(query);
+
+      // Get summary statistics for seller's stores
+      const storeStats = await Store.aggregate([
+        { $match: { sellerId: req.user._id } },
+        { $group: { 
+          _id: '$status', 
+          count: { $sum: 1 } 
+        }}
+      ]);
+
+      res.json({
+        stores,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(total / parseInt(limit)),
+          totalStores: total,
+          limit: parseInt(limit),
+        },
+        summary: {
+          statusBreakdown: storeStats,
+          totalStores: total
+        },
+        message: 'Your stores retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Get seller stores error:', error);
+      res.status(500).json({ 
+        message: 'Error fetching your stores', 
         error: error.message 
       });
     }

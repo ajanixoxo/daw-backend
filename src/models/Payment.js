@@ -9,7 +9,6 @@ const paymentSchema = new mongoose.Schema({
   stripePaymentIntentId: {
     type: String,
     required: true,
-    unique: true,
   },
   stripeCustomerId: {
     type: String,
@@ -41,7 +40,7 @@ const paymentSchema = new mongoose.Schema({
   },
   paymentType: {
     type: String,
-    enum: ['order', 'subscription', 'wallet_topup', 'masterclass', 'other'],
+    enum: ['order', 'subscription', 'wallet_topup', 'masterclass', 'cart', 'other'],
     required: true,
   },
   relatedId: {
@@ -97,12 +96,7 @@ const paymentSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Indexes for better query performance
-paymentSchema.index({ userId: 1, status: 1 });
-paymentSchema.index({ stripePaymentIntentId: 1 });
-paymentSchema.index({ stripeCustomerId: 1 });
-paymentSchema.index({ paymentType: 1, status: 1 });
-paymentSchema.index({ createdAt: -1 });
+// No additional indexes - only using default _id index
 
 // Virtual for total refunded amount
 paymentSchema.virtual('totalRefunded').get(function() {

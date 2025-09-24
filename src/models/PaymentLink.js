@@ -43,7 +43,7 @@ const paymentLinkSchema = new mongoose.Schema({
   },
   paymentType: {
     type: String,
-    enum: ['subscription', 'one_time', 'donation', 'membership', 'product'],
+    enum: ['subscription', 'one_time', 'donation', 'membership', 'product', 'cart'],
     required: true,
   },
   relatedId: {
@@ -52,7 +52,7 @@ const paymentLinkSchema = new mongoose.Schema({
   },
   relatedModel: {
     type: String,
-    enum: ['Product', 'Subscription', 'Masterclass', 'Membership'],
+    enum: ['Product', 'Subscription', 'Masterclass', 'Membership', 'Order'],
     required: false,
   },
   metadata: {

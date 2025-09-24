@@ -12,6 +12,7 @@ const WalletTransaction = require('./WalletTransaction');
 const Loan = require('./Loan');
 const Contribution = require('./Contribution');
 const Review = require('./Review');
+const Favorites = require('./Favorites');
 const Notification = require('./Notification');
 
 module.exports = {
@@ -28,6 +29,7 @@ module.exports = {
   Loan,
   Contribution,
   Review,
+  Favorites,
   Notification,
 };
 
