@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { body, validationResult } = require('express-validator');
 const auth = require('../middleware/auth');
 const { authorizeRoles, authorizeOwnership } = require('../middleware/authorize');
@@ -6,17 +7,22 @@ const { imageUploadMiddleware, processUploadedFiles, handleMulterError } = requi
 const { ROLES } = require('../config/roles');
 const Cooperative = require('../models/Cooperative');
 const Membership = require('../models/Membership');
+const { v4: uuidv4 } = require('uuid');
 const User = require('../models/User');
+const Product = require('../models/Product');
 
 const router = express.Router();
 
 // Validation middleware
 const validateCooperative = [
-  body('name').trim().notEmpty().withMessage('Cooperative name is required'),
+  body('name').trim().notEmpty().withMessage('Cooperative name is required')
+    .isLength({ min: 2, max: 100 }).withMessage('Cooperative name must be between 2 and 100 characters'),
   body('description').trim().notEmpty().withMessage('Description is required'),
-  body('imageUrl').optional().trim().isURL().withMessage('Invalid image URL format'),
+  body('imageUrl').optional().trim(),
   body('contactInfo.phone').optional().trim(),
-  body('contactInfo.email').optional().isEmail().withMessage('Invalid email format'),
+  body('contactInfo.email').trim().notEmpty().withMessage('Cooperative email is required')
+    .isEmail().withMessage('Invalid email format')
+    .normalizeEmail(),
   body('location.address').optional().trim(),
   body('location.city').optional().trim(),
   body('location.state').optional().trim(),
@@ -28,6 +34,43 @@ const validateMemberInvite = [
   body('roleInCoop').isIn(['member', 'admin', 'moderator', 'treasurer', 'secretary'])
     .withMessage('Invalid role specified'),
 ];
+
+router.get('/my-invitations', 
+  auth, 
+  async (req, res) => {
+    try {
+      const userId = req.user._id;
+      // Get the Coorporatibe ID from the User
+      const cooprtaiove  = await Cooperative.find({
+        adminId: userId
+      });
+      const cooperativeIds = cooprtaiove.map(c => c._id);
+      const { status = 'pending' } = req.query;
+      const invitations = await Membership.find({
+        cooperativeId: { $in: cooperativeIds },
+        status: status
+      })
+      .populate('cooperativeId', 'name description logo contactInfo')
+      .sort({ joinedAt: -1 });
+
+      res.json({
+        message: 'User invitations retrieved successfully',
+        invitations: invitations.map(membership => ({
+          id: membership._id,
+          cooperative: membership.cooperativeId,
+          roleInCoop: membership.roleInCoop,
+          status: membership.status,
+          invitedAt: membership.joinedAt
+        }))
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        message: 'Error retrieving invitations', 
+        error: error.message 
+      });
+    }
+  }
+);
 
 // Create a new cooperative (Only ADMIN can create cooperatives)
 router.post('/', 
@@ -79,6 +122,8 @@ router.post('/',
         }));
       }
 
+      cooperativeData.cooperative_id = uuidv4();
+
       const cooperative = new Cooperative(cooperativeData);
       await cooperative.save();
 
@@ -107,14 +152,64 @@ router.post('/',
   }
 );
 
+// Get cooperative by cooperative_id (foreign key lookup)
+router.get('/by-id/:cooperative_id', 
+  auth, 
+  async (req, res) => {
+    try {
+      const cooperative = await Cooperative.findOne({ cooperative_id: req.params.cooperative_id })
+        .populate('adminId', 'name email')
+        .populate('verificationDocuments.verifiedBy', 'name');
+
+      if (!cooperative) {
+        return res.status(404).json({ message: 'Cooperative not found' });
+      }
+
+      // Hierarchy-based access control
+      if (req.user.role === ROLES.ADMIN) {
+        // Platform admin can view all cooperatives
+      } else if (req.user.role === ROLES.COOPERATIVE_ADMIN) {
+        // Cooperative admin can only view their own cooperative
+        const membership = await Membership.findOne({
+          cooperativeId: cooperative._id,
+          userId: req.user._id,
+          roleInCoop: 'admin',
+          status: 'active'
+        });
+        
+        if (!membership) {
+          return res.status(403).json({ 
+            message: 'Access denied. You can only view cooperatives you manage.' 
+          });
+        }
+      }
+
+      res.json({
+        cooperative: cooperative.getSummary(),
+        stats: cooperative.getStats(),
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        message: 'Error fetching cooperative', 
+        error: error.message 
+      });
+    }
+  }
+);
+
 // List all cooperatives (All authenticated users)
 router.get('/', 
   auth, 
   async (req, res) => {
     try {
-      const { page = 1, limit = 10, status, verificationStatus } = req.query;
+      const { page = 1, limit = 10, status, verificationStatus, cooperative_id } = req.query;
       
       const query = {};
+      
+      // Filter by cooperative_id if provided
+      if (cooperative_id) {
+        query.cooperative_id = cooperative_id;
+      }
       
       // If user is not admin, only show active and verified cooperatives by default
       if (req.user.role !== ROLES.ADMIN) {
@@ -129,6 +224,7 @@ router.get('/',
 
       const cooperatives = await Cooperative.find(query)
         .populate('adminId', 'name email')
+        .populate('memberships')
         .limit(limit * 1)
         .skip((page - 1) * limit)
         .sort({ createdAt: -1 });
@@ -501,12 +597,14 @@ router.get('/:id/members',
       }
       
       if (roleInCoop) query.roleInCoop = roleInCoop;
-
+      console.log("Query",query);
       const memberships = await Membership.find(query)
         .populate('userId', 'name email profilePicture')
         .limit(limit * 1)
         .skip((page - 1) * limit)
         .sort({ joinedAt: -1 });
+
+        console.log("Memberships",memberships);
 
       const total = await Membership.countDocuments(query);
 
@@ -528,7 +626,69 @@ router.get('/:id/members',
   }
 );
 
-// Update cooperative info
+// Update cooperative info by cooperative_id
+router.patch('/by-id/:cooperative_id', 
+  auth, 
+  validateCooperative,
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const cooperativeId = req.params.cooperative_id;
+
+      // Check if cooperative exists
+      const cooperative = await Cooperative.findOne({ cooperative_id: cooperativeId });
+      if (!cooperative) {
+        return res.status(404).json({ message: 'Cooperative not found' });
+      }
+
+      // Hierarchy-based access control
+      if (req.user.role === ROLES.ADMIN) {
+        // Platform admin can update any cooperative
+      } else if (req.user.role === ROLES.COOPERATIVE_ADMIN) {
+        // Cooperative admin can only update their own cooperative
+        const membership = await Membership.findOne({
+          cooperativeId: cooperative._id,
+          userId: req.user._id,
+          roleInCoop: 'admin',
+          status: 'active'
+        });
+        
+        if (!membership) {
+          return res.status(403).json({ 
+            message: 'Access denied. You can only update cooperatives you manage.' 
+          });
+        }
+      } else {
+        return res.status(403).json({ 
+          message: 'Access denied. Only administrators can update cooperative information.' 
+        });
+      }
+
+      // Update cooperative
+      const updatedCooperative = await Cooperative.findOneAndUpdate(
+        { cooperative_id: cooperativeId },
+        { ...req.body, updatedAt: new Date() },
+        { new: true, runValidators: true }
+      );
+
+      res.json({
+        message: 'Cooperative updated successfully',
+        cooperative: updatedCooperative.getSummary(),
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        message: 'Error updating cooperative', 
+        error: error.message 
+      });
+    }
+  }
+);
+
+// Update cooperative info by MongoDB _id
 router.patch('/:id', 
   auth, 
   // validateCooperative,
@@ -592,7 +752,50 @@ router.patch('/:id',
   }
 );
 
-// Remove cooperative (Admin only)
+// Remove cooperative by cooperative_id (Admin only)
+router.delete('/by-id/:cooperative_id', 
+  auth, 
+  authorizeRoles(ROLES.ADMIN),
+  async (req, res) => {
+    try {
+      const cooperativeId = req.params.cooperative_id;
+
+      // Check if cooperative exists
+      const cooperative = await Cooperative.findOne({ cooperative_id: cooperativeId });
+      if (!cooperative) {
+        return res.status(404).json({ message: 'Cooperative not found' });
+      }
+
+      // Check if cooperative has active members
+      const activeMembers = await Membership.countDocuments({
+        cooperativeId: cooperative._id,
+        status: 'active',
+      });
+
+      if (activeMembers > 0) {
+        return res.status(400).json({ 
+          message: 'Cannot delete cooperative with active members' 
+        });
+      }
+
+      // Delete cooperative and related data
+      await Cooperative.findOneAndDelete({ cooperative_id: cooperativeId });
+      await Membership.deleteMany({ cooperativeId: cooperative._id });
+
+      res.json({ 
+        message: 'Cooperative removed successfully',
+        cooperative_id: cooperativeId 
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        message: 'Error removing cooperative', 
+        error: error.message 
+      });
+    }
+  }
+);
+
+// Remove cooperative by MongoDB _id (Admin only)
 router.delete('/:id', 
   auth, 
   authorizeRoles(ROLES.ADMIN),
@@ -632,17 +835,369 @@ router.delete('/:id',
   }
 );
 
-// ========================
-// CASE 1: Member Request to Join Cooperative
-// ========================
-
-// Request to join a cooperative (for buyers/sellers)
-router.post('/:id/join', 
+// Get all products under a cooperative (Cooperative Admin only)
+router.get('/:id/products', 
   auth, 
   async (req, res) => {
     try {
       const cooperativeId = req.params.id;
+      const { 
+        page = 1, 
+        limit = 20, 
+        status, 
+        category, 
+        subcategory,
+        search,
+        sortBy = 'createdAt',
+        sortOrder = 'desc',
+        stockStatus,
+        minPrice,
+        maxPrice
+      } = req.query;
+
+      // Check if cooperative exists
+      const cooperative = await Cooperative.findById(cooperativeId);
+      if (!cooperative) {
+        return res.status(404).json({ message: 'Cooperative not found' });
+      }
+
+      // Authorization: Only cooperative admins can access this endpoint
+      // if (req.user.role === ROLES.ADMIN) {
+      //   // Platform admin can view all cooperative products
+      // } else if (req.user.role === ROLES.COOPERATIVE_ADMIN) {
+      //   // Cooperative admin can only view products from their own cooperative
+      //   const membership = await Membership.findOne({
+      //     cooperativeId,
+      //     userId: req.user._id,
+      //     roleInCoop: { $in: ['admin', 'moderator'] },
+      //     status: 'active'
+      //   });
+        
+      //   if (!membership) {
+      //     return res.status(403).json({ 
+      //       message: 'Access denied. You can only view products from cooperatives you manage.' 
+      //     });
+      //   }
+      // } else {
+      //   return res.status(403).json({ 
+      //     message: 'Access denied. Only cooperative administrators can view cooperative products.' 
+      //   });
+      // }
+
+      // Build query
+      const query = { cooperativeId };
+
+      // Apply filters
+      if (status) query.status = status;
+      if (category) query.category = category;
+      if (subcategory) query.subcategory = subcategory;
+      if (stockStatus) query.stockStatus = stockStatus;
+      
+      // Price range filter
+      if (minPrice || maxPrice) {
+        query.price = {};
+        if (minPrice) query.price.$gte = parseFloat(minPrice);
+        if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+      }
+
+      // Search functionality
+      if (search) {
+        query.$or = [
+          { title: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+          { tags: { $in: [new RegExp(search, 'i')] } }
+        ];
+      }
+
+      // Sort configuration
+      const sortConfig = {};
+      sortConfig[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+      // Execute query with pagination
+      const products = await Product.find(query)
+        .populate('sellerId', 'name email profilePicture')
+        .populate('storeId', 'name description')
+        .populate('reviewedBy', 'name')
+        .sort(sortConfig)
+        .limit(limit * 1)
+        .skip((page - 1) * limit);
+
+      // Get total count for pagination
+      const total = await Product.countDocuments(query);
+
+      // Get statistics
+      const stats = await Product.aggregate([
+        { $match: { cooperativeId: (cooperativeId) } },
+        {
+          $group: {
+            _id: null,
+            totalProducts: { $sum: 1 },
+            totalValue: { $sum: '$price' },
+            totalStock: { $sum: '$inventory' },
+            approvedProducts: {
+              $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] }
+            },
+            pendingProducts: {
+              $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+            },
+            rejectedProducts: {
+              $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] }
+            },
+            inStockProducts: {
+              $sum: { $cond: [{ $eq: ['$stockStatus', 'In Stock'] }, 1, 0] }
+            },
+            outOfStockProducts: {
+              $sum: { $cond: [{ $eq: ['$stockStatus', 'Out of Stock'] }, 1, 0] }
+            },
+            lowStockProducts: {
+              $sum: { $cond: [{ $eq: ['$stockStatus', 'Low Stock'] }, 1, 0] }
+            }
+          }
+        }
+      ]);
+
+      const cooperativeStats = stats.length > 0 ? stats[0] : {
+        totalProducts: 0,
+        totalValue: 0,
+        totalStock: 0,
+        approvedProducts: 0,
+        pendingProducts: 0,
+        rejectedProducts: 0,
+        inStockProducts: 0,
+        outOfStockProducts: 0,
+        lowStockProducts: 0
+      };
+
+      res.json({
+        message: 'Cooperative products retrieved successfully',
+        cooperative: {
+          id: cooperative._id,
+          cooperative_id: cooperative.cooperative_id,
+          name: cooperative.name,
+          description: cooperative.description
+        },
+        products,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(total / limit),
+          totalProducts: total,
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+          limit: parseInt(limit)
+        },
+        statistics: cooperativeStats,
+        filters: {
+          status,
+          category,
+          subcategory,
+          stockStatus,
+          minPrice,
+          maxPrice,
+          search
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching cooperative products:', error);
+      res.status(500).json({ 
+        message: 'Error fetching cooperative products', 
+        error: error.message 
+      });
+    }
+  }
+);
+
+// Get products by cooperative_id (foreign key lookup)
+router.get('/by-id/:cooperative_id/products', 
+  auth, 
+  async (req, res) => {
+    try {
+      const cooperativeId = req.params.cooperative_id;
+      const { 
+        page = 1, 
+        limit = 20, 
+        status, 
+        category, 
+        subcategory,
+        search,
+        sortBy = 'createdAt',
+        sortOrder = 'desc',
+        stockStatus,
+        minPrice,
+        maxPrice
+      } = req.query;
+
+      // Find cooperative by cooperative_id
+      const cooperative = await Cooperative.findOne({ cooperative_id: cooperativeId });
+      if (!cooperative) {
+        return res.status(404).json({ message: 'Cooperative not found' });
+      }
+
+      // Authorization: Only cooperative admins can access this endpoint
+      if (req.user.role === ROLES.ADMIN) {
+        // Platform admin can view all cooperative products
+      } else if (req.user.role === ROLES.COOPERATIVE_ADMIN) {
+        // Cooperative admin can only view products from their own cooperative
+        const membership = await Membership.findOne({
+          cooperativeId: cooperative._id,
+          userId: req.user._id,
+          roleInCoop: { $in: ['admin', 'moderator'] },
+          status: 'active'
+        });
+        
+        if (!membership) {
+          return res.status(403).json({ 
+            message: 'Access denied. You can only view products from cooperatives you manage.' 
+          });
+        }
+      } else {
+        return res.status(403).json({ 
+          message: 'Access denied. Only cooperative administrators can view cooperative products.' 
+        });
+      }
+
+      // Build query using the MongoDB _id
+      const query = { cooperativeId: cooperative._id };
+
+      // Apply filters
+      if (status) query.status = status;
+      if (category) query.category = category;
+      if (subcategory) query.subcategory = subcategory;
+      if (stockStatus) query.stockStatus = stockStatus;
+      
+      // Price range filter
+      if (minPrice || maxPrice) {
+        query.price = {};
+        if (minPrice) query.price.$gte = parseFloat(minPrice);
+        if (maxPrice) query.price.$lte = parseFloat(maxPrice);
+      }
+
+      // Search functionality
+      if (search) {
+        query.$or = [
+          { title: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+          { tags: { $in: [new RegExp(search, 'i')] } }
+        ];
+      }
+
+      // Sort configuration
+      const sortConfig = {};
+      sortConfig[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+      // Execute query with pagination
+      const products = await Product.find(query)
+        .populate('sellerId', 'name email profilePicture')
+        .populate('storeId', 'name description')
+        .populate('reviewedBy', 'name')
+        .sort(sortConfig)
+        .limit(limit * 1)
+        .skip((page - 1) * limit);
+
+      // Get total count for pagination
+      const total = await Product.countDocuments(query);
+
+      // Get statistics
+      const stats = await Product.aggregate([
+        { $match: { cooperativeId: mongoose.Types.ObjectId(cooperative._id) } },
+        {
+          $group: {
+            _id: null,
+            totalProducts: { $sum: 1 },
+            totalValue: { $sum: '$price' },
+            totalStock: { $sum: '$inventory' },
+            approvedProducts: {
+              $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] }
+            },
+            pendingProducts: {
+              $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+            },
+            rejectedProducts: {
+              $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] }
+            },
+            inStockProducts: {
+              $sum: { $cond: [{ $eq: ['$stockStatus', 'In Stock'] }, 1, 0] }
+            },
+            outOfStockProducts: {
+              $sum: { $cond: [{ $eq: ['$stockStatus', 'Out of Stock'] }, 1, 0] }
+            },
+            lowStockProducts: {
+              $sum: { $cond: [{ $eq: ['$stockStatus', 'Low Stock'] }, 1, 0] }
+            }
+          }
+        }
+      ]);
+
+      const cooperativeStats = stats.length > 0 ? stats[0] : {
+        totalProducts: 0,
+        totalValue: 0,
+        totalStock: 0,
+        approvedProducts: 0,
+        pendingProducts: 0,
+        rejectedProducts: 0,
+        inStockProducts: 0,
+        outOfStockProducts: 0,
+        lowStockProducts: 0
+      };
+
+      res.json({
+        message: 'Cooperative products retrieved successfully',
+        cooperative: {
+          id: cooperative._id,
+          cooperative_id: cooperative.cooperative_id,
+          name: cooperative.name,
+          description: cooperative.description
+        },
+        products,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(total / limit),
+          totalProducts: total,
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+          limit: parseInt(limit)
+        },
+        statistics: cooperativeStats,
+        filters: {
+          status,
+          category,
+          subcategory,
+          stockStatus,
+          minPrice,
+          maxPrice,
+          search
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching cooperative products:', error);
+      res.status(500).json({ 
+        message: 'Error fetching cooperative products', 
+        error: error.message 
+      });
+    }
+  }
+);
+
+
+// ========================
+// CASE 1: Member Request to Join Cooperative
+// ========================
+
+// Request to join a cooperative with loan plan (for buyers/sellers)
+router.post('/:id/join', 
+  auth, 
+  body('loanPlanId').isMongoId().withMessage('Valid loan plan ID is required'),
+  body('paymentMethod').isIn(['card', 'bank_transfer', 'mobile_money', 'wallet']).withMessage('Valid payment method is required'),
+  body('autoRenewal').optional().isBoolean().withMessage('Auto renewal must be boolean'),
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const cooperativeId = req.params.id;
       const userId = req.user._id;
+      const { loanPlanId, paymentMethod, autoRenewal = true } = req.body;
 
       // Check if cooperative exists and is active
       const cooperative = await Cooperative.findById(cooperativeId);
@@ -653,6 +1208,23 @@ router.post('/:id/join',
       if (cooperative.status !== 'active') {
         return res.status(400).json({ 
           message: 'Cannot join inactive cooperative' 
+        });
+      }
+
+      // Check if membership plan template exists and belongs to this cooperative
+      const MembershipPlanTemplate = require('../models/MembershipPlanTemplate');
+      const membershipPlanTemplate = await MembershipPlanTemplate.findById(loanPlanId);
+      if (!membershipPlanTemplate) {
+        return res.status(404).json({ message: 'Membership plan template not found' });
+      }
+
+      if (!membershipPlanTemplate.isActive) {
+        return res.status(400).json({ message: 'Membership plan template is not active' });
+      }
+
+      if (membershipPlanTemplate.cooperativeId.toString() !== cooperativeId) {
+        return res.status(400).json({ 
+          message: 'Membership plan template does not belong to this cooperative' 
         });
       }
 
@@ -675,7 +1247,21 @@ router.post('/:id/join',
         });
       }
 
-      // Create active membership (direct join, no approval required)
+      // Check if user already has an active membership plan with this cooperative
+      const MembershipPlan = require('../models/MembershipPlan');
+      const existingMembershipPlan = await MembershipPlan.findOne({
+        userId,
+        cooperativeId,
+        status: 'active',
+      });
+
+      if (existingMembershipPlan) {
+        return res.status(400).json({ 
+          message: 'You already have an active membership plan with this cooperative' 
+        });
+      }
+
+      // Create membership
       const memberCount = await Membership.countDocuments({
         cooperativeId,
         status: 'active'
@@ -685,14 +1271,56 @@ router.post('/:id/join',
         cooperativeId,
         userId,
         roleInCoop: 'member',
-        status: 'active', // Direct active status
+        status: 'active', // Auto-approve when purchasing plan
         joinedAt: new Date(),
-        approvedAt: new Date(), // Auto-approved
-        approvedBy: userId, // Self-approved
+        approvedAt: new Date(),
+        approvedBy: userId, // Self-approved for paid plans
         membershipNumber: `${cooperative.name.substring(0, 3).toUpperCase()}${String(memberCount + 1).padStart(4, '0')}`,
       });
 
+
+      // Calculate billing dates
+      const startDate = new Date();
+      const nextBillingDate = new Date();
+      nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+
+      // Create membership plan
+      const membershipPlan = new MembershipPlan({
+        userId,
+        cooperativeId,
+        membershipPlanTemplateId: loanPlanId,
+        planDetails: {
+          name: membershipPlanTemplate.name,
+          category: membershipPlanTemplate.category,
+          monthlyFee: membershipPlanTemplate.pricing.monthlyFee,
+          loanAccess: membershipPlanTemplate.loanAccess,
+          benefits: membershipPlanTemplate.benefits,
+          features: membershipPlanTemplate.features.filter(f => f.included),
+        },
+        billing: {
+          startDate,
+          nextBillingDate,
+          currency: membershipPlanTemplate.pricing.currency,
+        },
+        autoRenewal: {
+          enabled: autoRenewal,
+        },
+      });
+
+      membership.membershipPlanId = membershipPlan._id;
       await membership.save();
+
+
+      // Process initial payment (simulate payment processing)
+      const totalAmount = membershipPlanTemplate.pricing.monthlyFee + (membershipPlanTemplate.pricing.setupFee || 0);
+      const transactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      await membershipPlan.processPayment(
+        totalAmount,
+        paymentMethod,
+        transactionId,
+        `Initial payment for ${membershipPlanTemplate.name} plan`
+      );
 
       // Auto-upgrade user to cooperative tier if they're freemium
       if (req.user.userTier === 'freemium') {
@@ -700,7 +1328,13 @@ router.post('/:id/join',
         await req.user.save();
       }
 
-      // Update cooperative member count (active members only)
+      // Auto-upgrade user to SELLER role when joining cooperative (if they're currently BUYER)
+      if (req.user.role === ROLES.BUYER) {
+        req.user.role = ROLES.SELLER;
+        await req.user.save();
+      }
+
+      // Update cooperative member count
       cooperative.membership.totalMembers = await Membership.countDocuments({
         cooperativeId,
         status: 'active'
@@ -709,7 +1343,7 @@ router.post('/:id/join',
       await cooperative.save();
 
       res.status(201).json({
-        message: 'Successfully joined cooperative! Welcome to the community.',
+        message: 'Successfully joined cooperative with membership plan!',
         membership: {
           id: membership._id,
           cooperativeId: membership.cooperativeId,
@@ -719,21 +1353,137 @@ router.post('/:id/join',
           joinedAt: membership.joinedAt,
           approvedAt: membership.approvedAt
         },
-        userTierUpgrade: req.user.userTier === 'cooperative' ? 'Upgraded to cooperative tier with full benefits' : null
+        membershipPlan: membershipPlan.getSummary(),
+        membershipPlanTemplate: membershipPlanTemplate.getSummary(),
+        payment: {
+          amount: totalAmount,
+          transactionId,
+          nextBillingDate,
+        },
+        userTierUpgrade: req.user.userTier === 'cooperative' ? 'Upgraded to cooperative tier with full benefits' : null,
+        roleUpgrade: req.user.role === ROLES.SELLER ? 'Upgraded to seller role - you can now sell products and access all seller features' : null
       });
     } catch (error) {
+      console.error('Join cooperative error:', error);
       res.status(500).json({ 
-        message: 'Error submitting join request', 
+        message: 'Error joining cooperative', 
         error: error.message 
       });
     }
   }
 );
 
-// Get pending join requests for a cooperative (Coop Admin + Admin)
+// Get user's membership plan for a cooperative
+router.get('/:id/my-membership-plan', 
+  auth, 
+  async (req, res) => {
+    try {
+      const cooperativeId = req.params.id;
+      const userId = req.user._id;
+
+      // Check if cooperative exists
+      const cooperative = await Cooperative.findById(cooperativeId);
+      if (!cooperative) {
+        return res.status(404).json({ message: 'Cooperative not found' });
+      }
+
+      // Get user's membership plan
+      const MembershipPlan = require('../models/MembershipPlan');
+      const membershipPlan = await MembershipPlan.findOne({
+        userId,
+        cooperativeId,
+        status: 'active',
+      }).populate('membershipPlanTemplateId');
+
+      if (!membershipPlan) {
+        return res.status(404).json({ 
+          message: 'No active membership plan found for this cooperative' 
+        });
+      }
+
+      res.json({
+        message: 'Membership plan retrieved successfully',
+        membershipPlan: membershipPlan.getSummary(),
+        membershipPlanTemplate: membershipPlan.membershipPlanTemplateId,
+        cooperative: {
+          id: cooperative._id,
+          name: cooperative.name,
+        },
+      });
+    } catch (error) {
+      console.error('Get membership plan error:', error);
+      res.status(500).json({ 
+        message: 'Error retrieving membership plan', 
+        error: error.message 
+      });
+    }
+  }
+);
+
+// Cancel membership plan
+router.patch('/:id/cancel-membership-plan', 
+  auth, 
+  body('reason').optional().trim().isLength({ max: 500 }).withMessage('Reason must be less than 500 characters'),
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const cooperativeId = req.params.id;
+      const userId = req.user._id;
+
+      // Get user's membership plan
+      const MembershipPlan = require('../models/MembershipPlan');
+      const membershipPlan = await MembershipPlan.findOne({
+        userId,
+        cooperativeId,
+        status: 'active',
+      });
+
+      if (!membershipPlan) {
+        return res.status(404).json({ 
+          message: 'No active membership plan found for this cooperative' 
+        });
+      }
+
+      // Check for active loans
+      if (membershipPlan.loanUsage.currentActiveLoans > 0) {
+        return res.status(400).json({ 
+          message: 'Cannot cancel membership plan while you have active loans' 
+        });
+      }
+
+      // Cancel the plan
+      membershipPlan.status = 'cancelled';
+      membershipPlan.cancellation = {
+        cancelledAt: new Date(),
+        cancelledBy: userId,
+        reason: req.body.reason || 'User requested cancellation',
+      };
+      membershipPlan.autoRenewal.enabled = false;
+
+      await membershipPlan.save();
+
+      res.json({
+        message: 'Membership plan cancelled successfully',
+        membershipPlan: membershipPlan.getSummary(),
+      });
+    } catch (error) {
+      console.error('Cancel membership plan error:', error);
+      res.status(500).json({ 
+        message: 'Failed to cancel membership plan',
+        error: error.message 
+      });
+    }
+  }
+);
+
+// Get pending join requests for a cooperative (COOPERATIVE_ADMIN only)
 router.get('/:id/pending-requests', 
   auth, 
-  authorizeRoles(ROLES.COOPERATIVE_ADMIN, ROLES.ADMIN),
+  authorizeRoles(ROLES.COOPERATIVE_ADMIN),
   async (req, res) => {
     try {
       const cooperativeId = req.params.id;
@@ -745,20 +1495,18 @@ router.get('/:id/pending-requests',
         return res.status(404).json({ message: 'Cooperative not found' });
       }
 
-      // Check if user has access to this cooperative (if not admin)
-      if (req.user.role === ROLES.COOPERATIVE_ADMIN) {
-        const adminMembership = await Membership.findOne({
-          cooperativeId,
-          userId: req.user._id,
-          roleInCoop: { $in: ['admin', 'moderator'] },
-          status: 'active'
+      // Check if user has access to this cooperative
+      const adminMembership = await Membership.findOne({
+        cooperativeId,
+        userId: req.user._id,
+        roleInCoop: { $in: ['admin', 'moderator'] },
+        status: 'active'
+      });
+      
+      if (!adminMembership) {
+        return res.status(403).json({ 
+          message: 'Access denied to this cooperative' 
         });
-        
-        if (!adminMembership) {
-          return res.status(403).json({ 
-            message: 'Access denied to this cooperative' 
-          });
-        }
       }
 
       // Get pending requests with pagination
@@ -802,9 +1550,10 @@ router.get('/:id/pending-requests',
   }
 );
 
-// Approve/Reject join request (Hierarchy-based access)
+// Approve/Reject join request (COOPERATIVE_ADMIN only)
 router.patch('/:id/membership/:membershipId/status', 
   auth, 
+  authorizeRoles(ROLES.COOPERATIVE_ADMIN),
   body('action').isIn(['approve', 'reject']).withMessage('Action must be approve or reject'),
   body('reason').optional().trim(),
   async (req, res) => {
@@ -824,29 +1573,6 @@ router.patch('/:id/membership/:membershipId/status',
         return res.status(404).json({ message: 'Cooperative not found' });
       }
 
-      // Hierarchy-based access control
-      if (req.user.role === ROLES.ADMIN) {
-        // Platform admin can approve/reject for any cooperative
-      } else if (req.user.role === ROLES.COOPERATIVE_ADMIN) {
-        // Cooperative admin can only approve/reject for their own cooperative
-        const adminMembership = await Membership.findOne({
-          cooperativeId,
-          userId: req.user._id,
-          roleInCoop: 'admin',
-          status: 'active'
-        });
-        
-        if (!adminMembership) {
-          return res.status(403).json({ 
-            message: 'Access denied. You can only manage membership requests for cooperatives you manage.' 
-          });
-        }
-      } else {
-        return res.status(403).json({ 
-          message: 'Access denied. Only administrators can manage membership requests.' 
-        });
-      }
-
       // Find the membership request
       const membership = await Membership.findOne({
         _id: membershipId,
@@ -863,20 +1589,18 @@ router.patch('/:id/membership/:membershipId/status',
         });
       }
 
-      // Check if user has access to this cooperative (if not admin)
-      if (req.user.role === ROLES.COOPERATIVE_ADMIN) {
-        const adminMembership = await Membership.findOne({
-          cooperativeId,
-          userId: req.user._id,
-          roleInCoop: { $in: ['admin', 'moderator'] },
-          status: 'active'
+      // Check if user has access to this cooperative
+      const adminMembership = await Membership.findOne({
+        cooperativeId,
+        userId: req.user._id,
+        roleInCoop: { $in: ['admin', 'moderator'] },
+        status: 'active'
+      });
+      
+      if (!adminMembership) {
+        return res.status(403).json({ 
+          message: 'Access denied to this cooperative' 
         });
-        
-        if (!adminMembership) {
-          return res.status(403).json({ 
-            message: 'Access denied to this cooperative' 
-          });
-        }
       }
 
       // Update membership status
@@ -937,43 +1661,145 @@ router.patch('/:id/membership/:membershipId/status',
   }
 );
 
+// Approve/Reject join request by membershipNumber (COOPERATIVE_ADMIN only)
+router.patch('/:id/membership/by-number/:membershipNumber/status', 
+  auth, 
+  authorizeRoles(ROLES.COOPERATIVE_ADMIN),
+  body('action').isIn(['approve', 'reject']).withMessage('Action must be approve or reject'),
+  body('reason').optional().trim(),
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { action, reason } = req.body;
+      const cooperativeId = req.params.id;
+      const membershipNumber = req.params.membershipNumber;
+
+      console.log('Membership status update request:', {
+        cooperativeId,
+        membershipNumber,
+        action,
+        userRole: req.user.role,
+        userId: req.user._id
+      });
+
+      // Check if cooperative exists
+      const cooperative = await Cooperative.findById(cooperativeId);
+      if (!cooperative) {
+        return res.status(404).json({ message: 'Cooperative not found' });
+      }
+
+      // Find the membership by membershipNumber and cooperativeId
+      const membership = await Membership.findOne({
+        membershipNumber: membershipNumber,
+        cooperativeId
+      }).populate('userId', 'name email');
+
+      if (!membership) {
+        return res.status(404).json({ 
+          message: `Membership with number ${membershipNumber} not found in this cooperative` 
+        });
+      }
+
+      console.log('Found membership:', {
+        membershipId: membership._id,
+        membershipNumber: membership.membershipNumber,
+        currentStatus: membership.status,
+        userId: membership.userId._id
+      });
+
+      if (membership.status !== 'pending') {
+        return res.status(400).json({ 
+          message: `Cannot ${action} membership with status: ${membership.status}. Only pending memberships can be approved or rejected.` 
+        });
+      }
+
+      // Check if user has access to this cooperative
+      const adminMembership = await Membership.findOne({
+        cooperativeId,
+        userId: req.user._id,
+        roleInCoop: { $in: ['admin', 'moderator'] },
+        status: 'active'
+      });
+      
+      if (!adminMembership) {
+        return res.status(403).json({ 
+          message: 'Access denied to this cooperative' 
+        });
+      }
+
+      // Update membership status
+      if (action === 'approve') {
+        membership.status = 'active';
+        membership.approvedAt = new Date();
+        membership.approvedBy = req.user._id;
+        
+        // Auto-upgrade user to cooperative tier if they're a buyer/seller
+        const user = await User.findById(membership.userId._id);
+        if (user && user.userTier === 'freemium') {
+          user.upgradeTier('cooperative');
+          await user.save();
+        }
+      } else {
+        membership.status = 'terminated';
+        membership.terminatedAt = new Date();
+        membership.terminatedBy = req.user._id;
+        membership.terminationReason = reason || `Join request ${action}ed`;
+      }
+
+      await membership.save();
+
+      // Update cooperative member count
+      if (action === 'approve') {
+        cooperative.membership.totalMembers = await Membership.countDocuments({
+          cooperativeId,
+          status: 'active'
+        });
+        cooperative.membership.activeMembers = cooperative.membership.totalMembers;
+        await cooperative.save();
+      }
+
+      console.log('Membership updated successfully:', {
+        membershipId: membership._id,
+        newStatus: membership.status,
+        approvedAt: membership.approvedAt,
+        approvedBy: membership.approvedBy
+      });
+
+      res.json({
+        message: `Membership request ${action}ed successfully`,
+        membership: {
+          id: membership._id,
+          membershipNumber: membership.membershipNumber,
+          user: membership.userId,
+          status: membership.status,
+          roleInCoop: membership.roleInCoop,
+          approvedAt: membership.approvedAt,
+          approvedBy: membership.approvedBy,
+          terminatedAt: membership.terminatedAt,
+          terminationReason: membership.terminationReason
+        }
+      });
+    } catch (error) {
+      console.error('Error updating membership status:', error);
+      res.status(500).json({ 
+        message: `Error ${req.body.action}ing membership request`, 
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  }
+);
+
 // ========================
 // CASE 2: Accept/Reject Invitations
 // ========================
 
 // Get user's invitations
-router.get('/my-invitations', 
-  auth, 
-  async (req, res) => {
-    try {
-      const userId = req.user._id;
-      const { status = 'pending' } = req.query;
 
-      const invitations = await Membership.find({
-        userId,
-        status: status
-      })
-      .populate('cooperativeId', 'name description logo contactInfo')
-      .sort({ joinedAt: -1 });
-
-      res.json({
-        message: 'User invitations retrieved successfully',
-        invitations: invitations.map(membership => ({
-          id: membership._id,
-          cooperative: membership.cooperativeId,
-          roleInCoop: membership.roleInCoop,
-          status: membership.status,
-          invitedAt: membership.joinedAt
-        }))
-      });
-    } catch (error) {
-      res.status(500).json({ 
-        message: 'Error retrieving invitations', 
-        error: error.message 
-      });
-    }
-  }
-);
 
 // Accept/Reject invitation
 router.patch('/invitations/:membershipId/respond', 
@@ -990,10 +1816,14 @@ router.patch('/invitations/:membershipId/respond',
       const membershipId = req.params.membershipId;
       const userId = req.user._id;
 
+      const cooperative = await Cooperative.find({
+        adminId: userId
+      });
+      const cooperativeIds = cooperative.map(c => c._id);
       // Find the invitation
       const membership = await Membership.findOne({
         _id: membershipId,
-        userId,
+        cooperativeId: { $in: cooperativeIds },
         status: 'pending'
       }).populate('cooperativeId');
 

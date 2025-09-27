@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const membershipSchema = new mongoose.Schema({
+  membershipPlanId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MembershipPlan',
+    required: true,
+  },
   cooperativeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Cooperative',

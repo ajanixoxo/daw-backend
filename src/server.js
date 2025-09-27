@@ -27,6 +27,7 @@ const adminRoutes = require('./routes/admin');
 const masterclassRoutes = require('./routes/masterclass');
 const webhookRoutes = require('./routes/webhooks');
 const paymentLinkRoutes = require('./routes/paymentLinks');
+const membershipPlanTemplateRoutes = require('./routes/membershipPlanTemplates');
 // const userUpgradeRoutes = require('./routes/user-upgrade');
 
 // Load environment variables
@@ -126,6 +127,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/masterclass', masterclassRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/payment-links', paymentLinkRoutes);
+app.use('/api/membership-plan-templates', membershipPlanTemplateRoutes);
 // app.use('/api/user-upgrade', userUpgradeRoutes);
 
 // Basic route

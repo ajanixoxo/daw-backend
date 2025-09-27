@@ -8,6 +8,10 @@ const cooperativeSchema = new mongoose.Schema({
     trim: true,
     // Auto-generated cooperative ID that can be used as foreign key
   },
+  memberships: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MembershipPlanTemplate',
+  }],
   name: {
     type: String,
     required: true,

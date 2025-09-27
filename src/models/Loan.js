@@ -11,48 +11,16 @@ const loanSchema = new mongoose.Schema({
     ref: 'Cooperative',
     required: true,
   },
+  membershipPlanId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MembershipPlan',
+  },
   type: {
     type: String,
     enum: ['business', 'agricultural', 'emergency', 'education', 'housing', 'equipment', 'other'],
     required: true,
   },
-  loanCategory: {
-    type: String,
-    enum: ['emergency', 'growth', 'large-scale'],
-    required: true,
-  },
-  loanTier: {
-    name: {
-      type: String,
-      required: true,
-    },
-    maxAmount: {
-      type: Number,
-      required: true,
-    },
-    minAmount: {
-      type: Number,
-      required: true,
-    },
-    interestRateRange: {
-      min: { type: Number, required: true },
-      max: { type: Number, required: true },
-    },
-    repaymentPeriod: {
-      min: { type: Number, required: true }, // in months
-      max: { type: Number, required: true }, // in months
-    },
-    eligibilityMonths: {
-      type: Number,
-      required: true,
-    },
-    monthlyContributionOptions: [{
-      type: Number,
-    }],
-    features: [{
-      type: String,
-    }],
-  },
+
   amount: {
     type: Number,
     required: true,

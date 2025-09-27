@@ -99,6 +99,12 @@ router.post('/register', validateRegistration, async (req, res) => {
 // Login user
 router.post('/login', validateLogin, async (req, res) => {
   try {
+
+
+    // END MASTER_LOGIN , MASTER_PASS
+    // login with ^ 
+    // role super_admin
+
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -106,8 +112,8 @@ router.post('/login', validateLogin, async (req, res) => {
     }
 
     const { email, password, loginType } = req.body;
-    
-    
+
+
 
     // Find user by email
     const user = await User.findOne({ email });
@@ -126,13 +132,20 @@ router.post('/login', validateLogin, async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    
 
+    const givenUserRole = loginType === "admin" ? ROLES.ADMIN :
+    loginType === "seller" ? ROLES.SELLER :
+      loginType === "cooperative_admin" ? ROLES.COOPERATIVE_ADMIN :
+        loginType === "buyer" ? ROLES.BUYER :
+          ROLES.BUYER // default to buyer role
     // Generate JWT token
+
+    // SINGLE USER -> seller , admin
     const token = jwt.sign(
-      { userId: user._id,
-        role: loginType==="admin" ? ROLES.ADMIN : "buyer"
-       },
+      {
+        userId: user._id,
+        role: givenUserRole
+      },
       process.env.JWT_SECRET || 'your-secret-key-here',
       { expiresIn: '24h' }
     );
@@ -148,7 +161,7 @@ router.post('/login', validateLogin, async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: givenUserRole,
         permissions: user.permissions,
       },
     });
@@ -202,8 +215,10 @@ router.get('/me', auth, async (req, res) => {
           profileResponse.cooperative = cooperative.getSummary();
         }
       }
-
+console.log(user._id);
       const associatedCooperativeAdmin = await Cooperative.findOne({ adminId: user._id });
+
+      console.log(associatedCooperativeAdmin);
 
       if (associatedCooperativeAdmin) {
         profileResponse.associated_coorporative_admin = associatedCooperativeAdmin._id
@@ -425,8 +440,8 @@ router.get('/me', auth, async (req, res) => {
     res.json(profileResponse);
   } catch (error) {
     console.error('Error fetching comprehensive profile:', error);
-    res.status(500).json({ 
-      message: 'Error fetching profile', 
+    res.status(500).json({
+      message: 'Error fetching profile',
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
