@@ -137,7 +137,7 @@ router.post('/',
       // Check if user has active loans
       const activeLoans = await Loan.countDocuments({
         userId: req.user._id,
-        status: { $in: ['pending', 'approved', 'active'] },
+        status: { $in: ['pending', 'approved', 'rejected'] },
       });
 
       if (activeLoans > 0) {
@@ -246,7 +246,7 @@ router.get('/',
       //   query.userId = req.user._id;
       // }
 
-      // if (status) query.status = status;
+      if (status) query.status = status;
       // if (type) query.type = type;
 
       if (cooperativeId) {
@@ -370,7 +370,7 @@ router.patch('/:id/status',
         return res.status(404).json({ message: 'Loan not found' });
       }
 
-      console.log(req.user.role);
+      // console.log(req.user.role);
 
       // Check if user has permission to approve this loan
       if (req.user.role === ROLES.COOPERATIVE_ADMIN) {
@@ -528,7 +528,7 @@ router.get('/overdue/cooperative/:cooperativeId',
 
       const overdueLoans = await Loan.find({
         cooperativeId,
-        status: 'active',
+        status: 'approved',
         dueDate: { $lt: new Date() },
       }).populate('userId', 'name email phone');
 

@@ -1,30 +1,88 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const membershipSchema = new mongoose.Schema({
   membershipPlanId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'MembershipPlan',
+    ref: "MembershipPlan",
     required: true,
+  },
+  verificationFields: {
+    nextOfKin: {
+      fullName: { type: String, required: true },
+      relationship: { type: String, required: true },
+      phoneNumber: { type: String, required: true },
+      address: { type: String },
+      status: {
+        type: String,
+        enum: ["pending", "approved", "rejected"],
+        default: "pending",
+      },
+    },
+    bankDetails: {
+      accountName: { type: String, required: true },
+      accountNumber: { type: String, required: true },
+      bankName: { type: String, required: true },
+    },
+    bvn: {
+      type: String,
+      required: true,
+      unique: true, // BVN must be unique per user
+    },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
+    documents: [
+      {
+        status: {
+          type: String,
+          enum: ["pending", "approved", "rejected"],
+          default: "pending",
+        },
+        type: {
+          type: String,
+          enum: [
+            "registration",
+            "tax_id",
+            "bank_statement",
+            "identity",
+            "address_proof",
+            "other",
+          ],
+          required: true,
+        },
+        url: {
+          type: String,
+          required: true,
+        },
+        fileName: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+      },
+    ],
   },
   cooperativeId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Cooperative',
+    ref: "Cooperative",
     required: true,
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: "User",
     required: true,
   },
   roleInCoop: {
     type: String,
-    enum: ['member', 'admin', 'moderator', 'treasurer', 'secretary'],
-    default: 'member',
+    enum: ["member", "admin", "moderator", "treasurer", "secretary"],
+    default: "member",
   },
   status: {
     type: String,
-    enum: ['pending', 'active', 'suspended', 'terminated'],
-    default: 'pending',
+    enum: ["pending", "active", "suspended", "terminated"],
+    default: "pending",
   },
   joinedAt: {
     type: Date,
@@ -35,14 +93,14 @@ const membershipSchema = new mongoose.Schema({
   },
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: "User",
   },
   terminatedAt: {
     type: Date,
   },
   terminatedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: "User",
   },
   terminationReason: {
     type: String,
@@ -83,8 +141,8 @@ const membershipSchema = new mongoose.Schema({
     },
     contributionFrequency: {
       type: String,
-      enum: ['monthly', 'quarterly', 'annually', 'custom'],
-      default: 'monthly',
+      enum: ["monthly", "quarterly", "annually", "custom"],
+      default: "monthly",
     },
   },
   loans: {
@@ -145,18 +203,24 @@ membershipSchema.index({ cooperativeId: 1, status: 1 });
 membershipSchema.index({ membershipNumber: 1 });
 
 // Update timestamp on save
-membershipSchema.pre('save', function(next) {
+membershipSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
   next();
 });
 
 // Generate membership number before save
-membershipSchema.pre('save', async function(next) {
+membershipSchema.pre("save", async function (next) {
   if (this.isNew && !this.membershipNumber) {
-    const cooperative = await mongoose.model('Cooperative').findById(this.cooperativeId);
+    const cooperative = await mongoose
+      .model("Cooperative")
+      .findById(this.cooperativeId);
     if (cooperative) {
-      const count = await this.constructor.countDocuments({ cooperativeId: this.cooperativeId });
-      this.membershipNumber = `${cooperative.name.substring(0, 3).toUpperCase()}-${String(count + 1).padStart(4, '0')}`;
+      const count = await this.constructor.countDocuments({
+        cooperativeId: this.cooperativeId,
+      });
+      this.membershipNumber = `${cooperative.name
+        .substring(0, 3)
+        .toUpperCase()}-${String(count + 1).padStart(4, "0")}`;
     }
   }
   next();
@@ -168,7 +232,7 @@ membershipSchema.methods = {
    * Check if membership is active
    */
   isActive() {
-    return this.status === 'active';
+    return this.status === "active";
   },
 
   /**
@@ -182,7 +246,9 @@ membershipSchema.methods = {
    * Check if user is eligible for loans
    */
   isLoanEligible() {
-    return this.isActive() && this.loans.loanEligibility && this.fees.isUpToDate;
+    return (
+      this.isActive() && this.loans.loanEligibility && this.fees.isUpToDate
+    );
   },
 
   /**
@@ -201,7 +267,6 @@ membershipSchema.methods = {
   },
 };
 
-const Membership = mongoose.model('Membership', membershipSchema);
+const Membership = mongoose.model("Membership", membershipSchema);
 
 module.exports = Membership;
-

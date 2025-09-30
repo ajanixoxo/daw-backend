@@ -10,6 +10,7 @@ const Store = require('../models/Store');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const Review = require('../models/Review');
+const MembershipPlan = require('../models/MembershipPlan');
 
 const router = express.Router();
 
@@ -180,11 +181,13 @@ router.get('/me', auth, async (req, res) => {
 
     // Base profile response
     const profileResponse = {
+      member_count: 0,
       user: user.toObject(),
       cooperative: null,
       membership: null,
       stores: [],
       products: [],
+      product_count: 0,
       orders: {
         summary: {
           total: 0,
@@ -207,26 +210,53 @@ router.get('/me', auth, async (req, res) => {
     // For non-buyer users, include comprehensive information
     if (user.role !== ROLES.BUYER) {
       console.log(`Fetching comprehensive profile for ${user.role} user: ${user.email}`);
-
       // Get cooperative information if user is part of one
-      if (user.cooperativeId) {
-        const cooperative = await Cooperative.findById(user.cooperativeId);
-        if (cooperative) {
-          profileResponse.cooperative = cooperative.getSummary();
-        }
-      }
-console.log(user._id);
+      // if (user.cooperativeId) {
+      //   const cooperative = await Cooperative.findById(user.cooperativeId);
+      //   if (cooperative) {
+      //     console.log("DHHANA",cooperative);
+      //     profileResponse.cooperative= cooperative
+
+      //     // Get Membership Plan
+      //     const membership  = await Membership.findOne({
+      //       userId: user._id,
+      //       cooperativeId: cooperative._id
+      //     });
+      //     if (membership) {
+      //       console.log("DHHANA",membership);
+      //       profileResponse.membership = membership;
+      //     }
+      //   }
+      // }
+// console.log(user._id);
       const associatedCooperativeAdmin = await Cooperative.findOne({ adminId: user._id });
 
-      console.log(associatedCooperativeAdmin);
+      // console.log(associatedCooperativeAdmin);
 
       if (associatedCooperativeAdmin) {
         profileResponse.associated_coorporative_admin = associatedCooperativeAdmin._id
       }
 
+      if (profileResponse.associated_coorporative_admin){
+        // Get Products of that Cooporate
+        const products = await Product.countDocuments({ cooperativeId: profileResponse.associated_coorporative_admin })
+        .populate('storeId', 'name')
+        .populate('cooperativeId', 'name cooperative_id')
+        .sort({ createdAt: -1 })
+      
+          profileResponse.product_count = products
+
+        const allMemberships = await Membership.countDocuments({ cooperativeId: profileResponse.associated_coorporative_admin, roleInCoop: "member" })
+
+        profileResponse.member_count = allMemberships
+
+
+      }
+
       // Get membership information
       const memberships = await Membership.find({ userId: user._id })
         .populate('cooperativeId', 'name description cooperative_id imageUrl contactInfo')
+        .populate('membershipPlanId')
         .sort({ joinedAt: -1 });
 
       if (memberships.length > 0) {
@@ -238,7 +268,8 @@ console.log(user._id);
           membershipNumber: membership.membershipNumber,
           joinedAt: membership.joinedAt,
           approvedAt: membership.approvedAt,
-          fees: membership.fees
+          fees: membership.fees,
+          joinedPlan: membership.membershipPlanId
         }));
 
         // If user doesn't have cooperativeId but has active membership, use the first active one
@@ -248,6 +279,8 @@ console.log(user._id);
             profileResponse.cooperative = activeMembership.cooperativeId;
           }
         }
+
+    
       }
 
       // Get user's stores (for sellers/cooperative admins)
@@ -272,30 +305,30 @@ console.log(user._id);
       }
 
       // Get user's products (for sellers/cooperative admins)
-      if (user.role === ROLES.SELLER || user.role === ROLES.COOPERATIVE_ADMIN || user.role === ROLES.ADMIN) {
-        const products = await Product.find({ sellerId: user._id })
-          .populate('storeId', 'name')
-          .populate('cooperativeId', 'name cooperative_id')
-          .sort({ createdAt: -1 })
-          .limit(20); // Limit to recent 20 products
+      // if (user.role === ROLES.SELLER || user.role === ROLES.COOPERATIVE_ADMIN || user.role === ROLES.ADMIN) {
+      //   const products = await Product.find({ sellerId: user._id })
+      //     .populate('storeId', 'name')
+      //     .populate('cooperativeId', 'name cooperative_id')
+      //     .sort({ createdAt: -1 })
+      //     .limit(20); // Limit to recent 20 products
 
-        profileResponse.products = products.map(product => ({
-          id: product._id,
-          title: product.title,
-          description: product.description,
-          category: product.category,
-          subcategory: product.subcategory,
-          price: product.price,
-          imageUrl: product.imageUrl,
-          status: product.status,
-          stockStatus: product.stockStatus,
-          inventory: product.inventory,
-          store: product.storeId,
-          cooperative: product.cooperativeId,
-          createdAt: product.createdAt,
-          updatedAt: product.updatedAt
-        }));
-      }
+      //   // profileResponse.products = products.map(product => ({
+      //   //   id: product._id,
+      //   //   title: product.title,
+      //   //   description: product.description,
+      //   //   category: product.category,
+      //   //   subcategory: product.subcategory,
+      //   //   price: product.price,
+      //   //   imageUrl: product.imageUrl,
+      //   //   status: product.status,
+      //   //   stockStatus: product.stockStatus,
+      //   //   inventory: product.inventory,
+      //   //   store: product.storeId,
+      //   //   cooperative: product.cooperativeId,
+      //   //   createdAt: product.createdAt,
+      //   //   updatedAt: product.updatedAt
+      //   // }));
+      // }
 
       // Get order statistics (for all non-buyers)
       const orderStats = await Order.aggregate([

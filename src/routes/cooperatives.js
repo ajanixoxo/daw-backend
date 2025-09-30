@@ -10,6 +10,8 @@ const Membership = require('../models/Membership');
 const { v4: uuidv4 } = require('uuid');
 const User = require('../models/User');
 const Product = require('../models/Product');
+const Order = require('../models/Order');
+const MembershipPlanTemplate = require('../models/MembershipPlanTemplate');
 
 const router = express.Router();
 
@@ -34,6 +36,39 @@ const validateMemberInvite = [
   body('roleInCoop').isIn(['member', 'admin', 'moderator', 'treasurer', 'secretary'])
     .withMessage('Invalid role specified'),
 ];
+
+// Get current user's ID
+router.get('/me/id', 
+  auth, 
+  async (req, res) => {
+    try {
+      const cooperative = await Cooperative.findOne({
+        adminId: req.user._id
+      });
+      // console.log("DHHANA",cooperative);
+      res.json({
+        message: 'Cooperative ID retrieved successfully',
+        cooperativeId: cooperative._id,
+      });
+      // res.json({
+      //   message: 'User ID retrieved successfully',
+      //   userId: req.user._id,
+      //   user: {
+      //     id: req.user._id,
+      //     name: req.user.name,
+      //     email: req.user.email,
+      //     role: req.user.role,
+      //     userTier: req.user.userTier
+      //   }
+      // });
+    } catch (error) {
+      res.status(500).json({ 
+        message: 'Error retrieving user ID', 
+        error: error.message 
+      });
+    }
+  }
+);
 
 router.get('/my-invitations', 
   auth, 
@@ -597,7 +632,7 @@ router.get('/:id/members',
       }
       
       if (roleInCoop) query.roleInCoop = roleInCoop;
-      console.log("Query",query);
+      // console.log("Query",query);
       const memberships = await Membership.find(query)
         .populate('userId', 'name email profilePicture')
         .limit(limit * 1)
@@ -612,6 +647,7 @@ router.get('/:id/members',
         members: memberships.map(m => ({
           ...m.getSummary(),
           user: m.userId,
+          verificationFields: m.verificationFields || null, // Include verification fields for review
         })),
         totalPages: Math.ceil(total / limit),
         currentPage: page,
@@ -620,6 +656,81 @@ router.get('/:id/members',
     } catch (error) {
       res.status(500).json({ 
         message: 'Error fetching members', 
+        error: error.message 
+      });
+    }
+  }
+);
+
+// Get members by cooperative ID (query parameter)
+router.get('/members/by-coop', 
+  auth, 
+  async (req, res) => {
+    try {
+      const { cooperativeId, page = 1, limit = 20, status, roleInCoop } = req.query;
+
+      if (!cooperativeId) {
+        return res.status(400).json({ message: 'Cooperative ID is required' });
+      }
+
+      // Check if cooperative exists
+      const cooperative = await Cooperative.findById(cooperativeId);
+      if (!cooperative) {
+        return res.status(404).json({ message: 'Cooperative not found' });
+      }
+
+      // Build query
+      const query = { cooperativeId };
+      
+      // Non-admin users can only see active members by default
+      if (req.user.role !== ROLES.ADMIN && req.user.role !== ROLES.COOPERATIVE_ADMIN) {
+        query.status = status || 'active';
+      } else {
+        // Admins and cooperative admins can see all members with custom filters
+        if (status) query.status = status;
+      }
+      
+      if (roleInCoop) query.roleInCoop = roleInCoop;
+
+      const memberships = await Membership.find(query)
+        .populate('userId', 'name email profilePicture')
+        .limit(limit * 1)
+        .skip((page - 1) * limit)
+        .sort({ joinedAt: -1 });
+
+      const total = await Membership.countDocuments(query);
+
+      res.json({
+        message: 'Cooperative members retrieved successfully',
+        cooperative: {
+          id: cooperative._id,
+          name: cooperative.name,
+          description: cooperative.description
+        },
+        members: memberships.map(m => ({
+          ...m.getSummary(),
+
+          user: m.userId,
+          verificationFields: m.verificationFields || null, 
+          _id: m._id,
+          // Include verification fields for review
+        })),
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(total / limit),
+          totalMembers: total,
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+          limit: parseInt(limit)
+        },
+        filters: {
+          status,
+          roleInCoop
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        message: 'Error fetching cooperative members', 
         error: error.message 
       });
     }
@@ -1006,6 +1117,93 @@ router.get('/:id/products',
   }
 );
 
+router.get('/:id/plans', 
+  auth, 
+  async (req, res) => {
+    try {
+      const cooperativeId = req.params.id;
+      const membershipPlanTemplates = await MembershipPlanTemplate.find({ cooperativeId: cooperativeId });
+      return res.json(membershipPlanTemplates);
+    } catch (error) {
+      res.status(500).json({ 
+        message: 'Error fetching cooperative membership plan templates', 
+        error: error.message 
+      });
+    }
+  }
+);
+
+router.patch('/:id/plans/:planId', 
+  auth, 
+  async (req, res) => {
+    try {
+      const cooperativeId = req.params.id;
+      console.log("Cooperative ID",cooperativeId);
+      console.log("User ID",req.user._id);
+      const isUserAdminOfCooperative = await Cooperative.findOne({ _id: cooperativeId, adminId: req.user._id });
+      if (!isUserAdminOfCooperative) {
+        return res.status(403).json({ 
+          message: 'You are not authorized to update cooperative membership plan templates' 
+        });
+      }
+      const membershipPlanTemplates = await MembershipPlanTemplate.findByIdAndUpdate(req.params.planId, {
+        $set: req.body
+      }, { new: true });
+      return res.json(membershipPlanTemplates);
+    }
+    catch (error) {
+      res.status(500).json({ 
+        message: 'Error updating cooperative membership plan template', 
+        error: error.message 
+      });
+    }
+  }
+);
+
+
+router.delete('/:id/plans/:planId', 
+  auth, 
+  async (req, res) => {
+    try {
+      const cooperativeId = req.params.id;
+      const isUserAdminOfCooperative = await Cooperative.findOne({ _id: cooperativeId, adminId: req.user._id });
+      if (!isUserAdminOfCooperative) {
+        return res.status(403).json({ 
+          message: 'You are not authorized to delete cooperative membership plan templates' 
+        });
+      }
+      const membershipPlanTemplates = await MembershipPlanTemplate.findByIdAndDelete(req.params.planId);
+      return res.json(membershipPlanTemplates);
+    }
+    catch (error) {
+      res.status(500).json({ 
+        message: 'Error deleting cooperative membership plan template', 
+        error: error.message 
+      });
+    }
+  }
+);
+
+
+router.get('/:id/orders', 
+  auth, 
+  async (req, res) => {
+    try {
+      const cooperativeId = req.params.id;
+      const AllUsersOfCooporative = await Membership.find({ cooperativeId: cooperativeId, roleInCoop: 'member' });
+      const AllMembersIds = AllUsersOfCooporative.map(member => member.userId);
+      const AllOrders = await Order.find({ userId: { $in: AllMembersIds } });
+      res.json(AllOrders);
+    } catch (error) {
+      res.status(500).json({ 
+        message: 'Error fetching cooperative orders', 
+        error: error.message 
+      });
+    }
+  }
+);
+
+
 // Get products by cooperative_id (foreign key lookup)
 router.get('/by-id/:cooperative_id/products', 
   auth, 
@@ -1188,6 +1386,17 @@ router.post('/:id/join',
   body('loanPlanId').isMongoId().withMessage('Valid loan plan ID is required'),
   body('paymentMethod').isIn(['card', 'bank_transfer', 'mobile_money', 'wallet']).withMessage('Valid payment method is required'),
   body('autoRenewal').optional().isBoolean().withMessage('Auto renewal must be boolean'),
+  body('verificationFields.nextOfKin.fullName').trim().notEmpty().withMessage('Next of kin full name is required'),
+  body('verificationFields.nextOfKin.relationship').trim().notEmpty().withMessage('Next of kin relationship is required'),
+  body('verificationFields.nextOfKin.phoneNumber').trim().notEmpty().withMessage('Next of kin phone number is required'),
+  body('verificationFields.bankDetails.accountName').trim().notEmpty().withMessage('Bank account name is required'),
+  body('verificationFields.bankDetails.accountNumber').trim().notEmpty().withMessage('Bank account number is required'),
+  body('verificationFields.bankDetails.bankName').trim().notEmpty().withMessage('Bank name is required'),
+  body('verificationFields.bvn').trim().notEmpty().withMessage('BVN is required'),
+  body('verificationFields.documents').optional().isArray().withMessage('Documents must be an array'),
+  body('verificationFields.documents.*.type').optional().isIn(['registration', 'tax_id', 'bank_statement', 'identity', 'address_proof', 'other']).withMessage('Invalid document type'),
+  body('verificationFields.documents.*.url').optional().isURL().withMessage('Document URL must be valid'),
+  body('verificationFields.documents.*.fileName').optional().trim().notEmpty().withMessage('Document file name is required'),
   async (req, res) => {
     try {
       const errors = validationResult(req);
@@ -1197,7 +1406,7 @@ router.post('/:id/join',
 
       const cooperativeId = req.params.id;
       const userId = req.user._id;
-      const { loanPlanId, paymentMethod, autoRenewal = true } = req.body;
+      const { loanPlanId, paymentMethod, autoRenewal = true, verificationFields } = req.body;
 
       // Check if cooperative exists and is active
       const cooperative = await Cooperative.findById(cooperativeId);
@@ -1266,15 +1475,26 @@ router.post('/:id/join',
         cooperativeId,
         status: 'active'
       });
-      
+      // console.log({
+      //   nextOfKin: verificationFields.nextOfKin,
+      //   bankDetails: verificationFields.bankDetails,
+      //   bvn: verificationFields.bvn,
+      //   status: 'pending', // Set to pending for verification
+      //   documents: verificationFields.documents || [] // Include documents array
+      // })
       const membership = new Membership({
+        verificationFields: {
+          nextOfKin: verificationFields.nextOfKin,
+          bankDetails: verificationFields.bankDetails,
+          bvn: verificationFields.bvn,
+          status: 'pending', // Set to pending for verification
+          documents: verificationFields.documents || [] // Include documents array
+        },
         cooperativeId,
         userId,
         roleInCoop: 'member',
-        status: 'active', // Auto-approve when purchasing plan
+        status: 'pending', // Set to pending for verification
         joinedAt: new Date(),
-        approvedAt: new Date(),
-        approvedBy: userId, // Self-approved for paid plans
         membershipNumber: `${cooperative.name.substring(0, 3).toUpperCase()}${String(memberCount + 1).padStart(4, '0')}`,
       });
 
@@ -1310,6 +1530,8 @@ router.post('/:id/join',
       membership.membershipPlanId = membershipPlan._id;
       await membership.save();
 
+      console.log(membership);
+
 
       // Process initial payment (simulate payment processing)
       const totalAmount = membershipPlanTemplate.pricing.monthlyFee + (membershipPlanTemplate.pricing.setupFee || 0);
@@ -1343,7 +1565,7 @@ router.post('/:id/join',
       await cooperative.save();
 
       res.status(201).json({
-        message: 'Successfully joined cooperative with membership plan!',
+        message: 'Cooperative membership request submitted successfully! Your application is pending verification.',
         membership: {
           id: membership._id,
           cooperativeId: membership.cooperativeId,
@@ -1351,7 +1573,8 @@ router.post('/:id/join',
           roleInCoop: membership.roleInCoop,
           membershipNumber: membership.membershipNumber,
           joinedAt: membership.joinedAt,
-          approvedAt: membership.approvedAt
+          verificationFields: membership.verificationFields, // Include complete verification fields
+          verificationStatus: membership.verificationFields.status
         },
         membershipPlan: membershipPlan.getSummary(),
         membershipPlanTemplate: membershipPlanTemplate.getSummary(),
@@ -1360,8 +1583,10 @@ router.post('/:id/join',
           transactionId,
           nextBillingDate,
         },
-        userTierUpgrade: req.user.userTier === 'cooperative' ? 'Upgraded to cooperative tier with full benefits' : null,
-        roleUpgrade: req.user.role === ROLES.SELLER ? 'Upgraded to seller role - you can now sell products and access all seller features' : null
+        verification: {
+          status: 'pending',
+          message: 'Your membership application is pending verification. You will be notified once approved.'
+        }
       });
     } catch (error) {
       console.error('Join cooperative error:', error);
@@ -1563,7 +1788,7 @@ router.patch('/:id/membership/:membershipId/status',
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { action, reason } = req.body;
+      const { action, reason , docVerification, nextKinStatus } = req.body;
       const cooperativeId = req.params.id;
       const membershipId = req.params.membershipId;
 
@@ -1627,6 +1852,20 @@ router.patch('/:id/membership/:membershipId/status',
         membership.terminatedAt = new Date();
         membership.terminatedBy = req.user._id;
         membership.terminationReason = reason || `Join request ${action}ed`;
+      }
+
+      if (docVerification){
+        membership.verificationFields.documents = membership.verificationFields.documents.map(doc=>{
+          if (docVerification.find(d=>d.id === doc._id.toString())){
+            doc.status = docVerification.find(d=>d.id === doc._id.toString()).status;
+          }
+          return doc;
+        })
+
+      }
+
+      if (nextKinStatus){
+        membership.verificationFields.nextOfKin.status = nextKinStatus;
       }
 
       await membership.save();
