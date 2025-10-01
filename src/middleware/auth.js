@@ -18,6 +18,7 @@ const auth = async (req, res, next) => {
     
 // console.log(user);
     req.user = user;
+    req.user.role = decoded.role;
     req.token = token;
     next();
   } catch (error) {

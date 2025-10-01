@@ -52,7 +52,14 @@ router.post('/register', validateRegistration, async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, email, password, confirmPassword, role = ROLES.BUYER } = req.body;
+    const { name, email, password, confirmPassword, role = ROLES.BUYER , adminKey } = req.body;
+
+
+    const adminSecureKey = process.env.MASTER_KEY;
+
+    if (role=== ROLES.ADMIN && adminKey !== adminSecureKey) {
+      return res.status(400).json({ message: 'Secure Key is required for Admin Registration' });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -113,6 +120,8 @@ router.post('/login', validateLogin, async (req, res) => {
     }
 
     const { email, password, loginType } = req.body;
+    // console.log("DHHANA",process.env);
+   
 
 
 
@@ -174,7 +183,8 @@ router.post('/login', validateLogin, async (req, res) => {
 // Get current user profile with comprehensive information
 router.get('/me', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    let user = await User.findById(req.user._id).select('-password');
+    user.role = req.user.role;
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }

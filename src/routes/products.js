@@ -238,7 +238,7 @@ router.get('/categories', auth, async (req, res) => {
 
 // Get all products with filters and pagination
 router.get('/', async (req, res) => {
-  console.log('Products route hit');
+  // console.log('Products route hit');
   try {
     const { 
       category,
