@@ -163,16 +163,7 @@ router.post('/',
       await cooperative.save();
 
       // Create membership for the admin
-      const membership = new Membership({
-        cooperativeId: cooperative._id,
-        userId: req.user._id,
-        roleInCoop: 'admin',
-        status: 'active',
-        joinedAt: new Date(),
-        approvedAt: new Date(),
-        approvedBy: req.user._id,
-      });
-      await membership.save();
+      
 
       res.status(201).json({
         message: 'Cooperative created successfully',
