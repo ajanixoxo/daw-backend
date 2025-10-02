@@ -126,7 +126,7 @@ router.post('/',
       
       const cooperativeData = {
         ...req.body,
-        adminId: req.user._id,
+        adminId: req.body.userId,
         status: 'pending',
         verificationStatus: 'unverified',
       };
