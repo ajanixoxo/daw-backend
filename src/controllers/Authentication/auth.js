@@ -159,3 +159,49 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
     throw new AppError('Internal server error', 500);
   }
 });
+
+
+export const login = asyncHandler(async(req,res) => {
+  try {
+    const { email, password } = req.body;
+
+    if(!email || !password){
+      return res.status(400).json({
+        message:"All fields are required"
+      })
+    }
+
+    const User = await user.findOne({ email });
+    if(!User){
+      throw new AppError("User not found", 404);
+    }
+
+    const isMatched = await User.comparePassword(User.password);
+
+    if(!isMatched){
+      return res.status(400).json({
+        message:"Password is not valid"
+      })
+    }
+
+    if(!User.isVerified){
+      return res.status(400).json({
+        message:"please verify your pEmail"
+      })
+    }
+
+    const { accessToken, refreshToken } = await User.generateToken();
+
+    res.status(200).json({
+      message:"loggedIn successful",
+      User: User,
+      token:{
+        accessToken,
+        refreshToken
+      }
+    });
+  } catch (error) {
+    console.error('Error in login:', error);
+    throw new AppError('Internal server error', 500);
+  }
+})
