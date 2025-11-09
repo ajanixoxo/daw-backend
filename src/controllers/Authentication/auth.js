@@ -1,14 +1,15 @@
-import user from '../../models/userModel/user.js';
-import asyncHandler from 'express-async-handler';
-import AppError from '../../utils/Error/AppError.js';
-import { verificationEmailTemplate } from '../../utils/EmailTemplate/template.js';
-import jwt from 'jsonwebtoken';
+const user = require('@models/userModel/user.js');
+const asyncHandler = require('express-async-handler');
+const AppError = require('@utils/Error/AppError.js');
+const { verificationEmailTemplate } = require('@utils/EmailTemplate/template.js');
+const jwt = require('jsonwebtoken');
+
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 
 
-export const registerUser = asyncHandler(async (req, res) => {
+ const registerUser = asyncHandler(async (req, res) => {
   try {
     const { firstName, lastName, email, password, confirmPassword, phone, role } = req.body;
 
@@ -39,7 +40,7 @@ export const registerUser = asyncHandler(async (req, res) => {
     newUser.verificationToken = accessToken;
     await newUser.save();
 
-    const verificationLink = `${FRONTEND_URL}/verify/${accessToken}`;
+    const verificationLink = `${FRONTEND_URL}/auth/verify/email/${accessToken}`;
     await verificationEmailTemplate(newUser.email, newUser.firstName, verificationLink);
 
     res.status(201).json({
@@ -66,7 +67,7 @@ export const registerUser = asyncHandler(async (req, res) => {
 });
 
 
-export const verifyEmail = asyncHandler(async (req, res) => {
+ const verifyEmail = asyncHandler(async (req, res) => {
   try {
     const { token } = req.params;
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -74,6 +75,12 @@ export const verifyEmail = asyncHandler(async (req, res) => {
     const User = await user.findOne({ email: decoded.email });
     if (!User) {
       return res.status(400).json({ error: 'Invalid or expired token.' });
+    }
+
+    if(User.isVerified){
+      return res.status(400).json({
+        message:"User already verified"
+      })
     }
 
     User.isVerified = true;
@@ -88,7 +95,7 @@ export const verifyEmail = asyncHandler(async (req, res) => {
 });
 
 
-export const resendEmailVerificationLink = asyncHandler(async (req, res) => {
+ const resendEmailVerificationLink = asyncHandler(async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) {
@@ -109,7 +116,7 @@ export const resendEmailVerificationLink = asyncHandler(async (req, res) => {
     User.verificationToken = accessToken;
     await User.save();
 
-    const verificationLink = `${FRONTEND_URL}/verify/${accessToken}`;
+    const verificationLink = `${FRONTEND_URL}/auth/verify/email/${accessToken}`;
     await verificationEmailTemplate(User.email, User.firstName, verificationLink);
 
     res.status(200).json({
@@ -123,7 +130,7 @@ export const resendEmailVerificationLink = asyncHandler(async (req, res) => {
 });
 
 
-export const refreshAccessToken = asyncHandler(async (req, res) => {
+ const refreshAccessToken = asyncHandler(async (req, res) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {
@@ -161,47 +168,43 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
 });
 
 
-export const login = asyncHandler(async(req,res) => {
+ async function login(req, res) {
   try {
     const { email, password } = req.body;
 
-    if(!email || !password){
-      return res.status(400).json({
-        message:"All fields are required"
-      })
-    }
+    if (!email || !password)
+      return res.status(400).json({ message: "All fields are required" });
 
-    const User = await user.findOne({ email });
-    if(!User){
-      throw new AppError("User not found", 404);
-    }
+    const User = await user.findOne({ email }).select("+password");;
+    if (!User) return res.status(404).json({ message: "User not found" });
 
-    const isMatched = await User.comparePassword(User.password);
+    const isMatched = await User.comparePassword(password);
+    if (!isMatched)
+      return res.status(400).json({ message: "Invalid password" });
 
-    if(!isMatched){
-      return res.status(400).json({
-        message:"Password is not valid"
-      })
-    }
-
-    if(!User.isVerified){
-      return res.status(400).json({
-        message:"please verify your pEmail"
-      })
-    }
+    if (!User.isVerified)
+      return res.status(400).json({ message: "Please verify your email" });
 
     const { accessToken, refreshToken } = await User.generateToken();
 
+    User.password = undefined;
+    User.verificationToken = undefined;
+
     res.status(200).json({
-      message:"loggedIn successful",
-      User: User,
-      token:{
-        accessToken,
-        refreshToken
-      }
+      message: "Login successful",
+      user: User,
+      token: { accessToken, refreshToken },
     });
   } catch (error) {
-    console.error('Error in login:', error);
-    throw new AppError('Internal server error', 500);
+    console.error("Error in login:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
-})
+}
+
+module.exports = {
+  registerUser,
+  verifyEmail,
+  resendEmailVerificationLink,
+  refreshAccessToken,
+  login,
+};
