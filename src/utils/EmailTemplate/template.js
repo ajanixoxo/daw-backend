@@ -1,7 +1,9 @@
-import { sendEmail } from '../SendEmail/email.js';
-import asyncHandler from 'express-async-handler';
+// import { sendEmail } from '../SendEmail/email.js';
+// import asyncHandler from 'express-async-handler';
+const asyncHandler = require('express-async-handler');
+const { sendEmail } = require("@utils/sendEmail/email.js")
 
-export const verificationEmailTemplate = asyncHandler(async(email, firstName, link) => {
+const verificationEmailTemplate = asyncHandler(async(email, firstName, link) => {
   const subject = "Email Verification Code - Digital African Women";
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6;">
@@ -18,3 +20,7 @@ export const verificationEmailTemplate = asyncHandler(async(email, firstName, li
   await sendEmail(email, subject, html);
   console.log("Verification email sent to:", email);
 });
+
+module.exports ={
+  verificationEmailTemplate
+}

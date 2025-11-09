@@ -1,6 +1,9 @@
-import mongoose from 'mongoose';
-import AppError from '../utils/Error/AppError.js';
-import dotenv from 'dotenv';
+// import mongoose from 'mongoose';
+// import AppError from '../utils/Error/AppError.js';
+// import dotenv from 'dotenv';
+const mongoose = require('mongoose');
+const AppError = require('@utils/Error/AppError.js');
+const dotenv  = require('dotenv');
 dotenv.config();
 
 const connectDB = async() => {
@@ -13,4 +16,6 @@ const connectDB = async() => {
     }
 }
 
-export default connectDB;
+module.exports = 
+    connectDB
+;

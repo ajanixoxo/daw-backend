@@ -1,16 +1,23 @@
-import express from 'express';
-import {
-    registerUser,
-    verifyEmail,
-    resendEmailVerificationLink
-} from '../../controllers/Authentication/auth.js';
+const express = require("express");
+const {
+  registerUser,
+  verifyEmail,
+  resendEmailVerificationLink,
+  login,
+  refreshAccessToken
+} = require('@controllers/Authentication/auth.js');
+
 
 const router = express.Router();
 
 router.post('/register', registerUser);
 
-router.post('/verify/email/:token', verifyEmail);
+router.get('/verify/email/:token', verifyEmail);
 
 router.post('/resend/verificatiion/link', resendEmailVerificationLink);
 
-export default router;
+router.post('/login', login);
+
+router.post('/refresh/token', refreshAccessToken);
+
+module.exports = router;
