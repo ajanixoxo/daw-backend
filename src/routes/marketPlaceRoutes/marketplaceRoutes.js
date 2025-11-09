@@ -1,4 +1,3 @@
-// import * as marketplaceController from "@controllers/marketplaceController.js";
 const express = require('express');
 const {
     protect,
