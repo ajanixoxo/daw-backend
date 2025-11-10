@@ -1,7 +1,7 @@
 // import { sendEmail } from '../SendEmail/email.js';
 // import asyncHandler from 'express-async-handler';
 const asyncHandler = require('express-async-handler');
-const sendEmail  = require("@utils/sendEmail/email.js")
+const sendEmail  = require("@utils/SendEmail/email.js")
 
 const verificationEmailTemplate = asyncHandler(async(email, firstName, link) => {
   const subject = "Email Verification Code - Digital African Women";
