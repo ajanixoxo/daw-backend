@@ -8,9 +8,9 @@ import {
 
 const router = express.Router();
 
-router.post("/join", join);
-router.put("/:id/approve", approve);
-router.get("/cooperative/:cooperativeId", listMembers);
-router.get("/:id", getMember);
+router.post("/join",protect, restrictTo("registered_shopper"),  join);
+router.put("/:id/approve", protect, restrictTo("admin,cooperative_admin"), approve);
+router.get("/cooperative/:cooperativeId", protect, restrictTo("admin,cooperative_admin"), listMembers);
+router.get("/:id", protect, restrictTo("admin,cooperative_admin"), getMember);
 
 export default router;

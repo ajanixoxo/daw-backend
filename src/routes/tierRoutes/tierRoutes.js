@@ -7,8 +7,8 @@ import {
 
 const router = express.Router();
 
-router.post("/", createTier);
-router.get("/cooperative/:cooperativeId", listTiers);
-router.put("/:id", updateTier);
+router.post("/", protect, restrictTo("admin,cooperative_admin"), createTier);
+router.get("/cooperative/:cooperativeId", protect, restrictTo("admin,registered_shopper,seller"), listTiers);
+router.put("/:id", protect, restrictTo("admin,cooperative_admin"), updateTier);
 
 export default router;
