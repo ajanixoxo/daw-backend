@@ -1,7 +1,12 @@
-import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken'
-import dotenv from 'dotenv';
+// import mongoose from 'mongoose';
+// import bcrypt from 'bcrypt';
+// import jwt from 'jsonwebtoken'
+// import dotenv from 'dotenv';
+
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
 dotenv.config();
 
 const jwtsecret = process.env.JWT_SECRET;
@@ -146,4 +151,4 @@ UserSchema.methods.generateToken = async function(){
 
 
 const user = mongoose.model("User", UserSchema);
-export default user;
+module.exports =  user;

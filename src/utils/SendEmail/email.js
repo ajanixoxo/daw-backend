@@ -1,8 +1,11 @@
-import nodemailer from "nodemailer";
-import dotenv from "dotenv";
+// import nodemailer from "nodemailer";
+// import dotenv from "dotenv";
+
+const nodemailer = require('nodemailer');
+const dotenv = require('dotenv');
 dotenv.config();
 
-export const sendEmail = async (to, subject, html) => {
+const sendEmail = async (to, subject, html) => {
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -18,3 +21,4 @@ export const sendEmail = async (to, subject, html) => {
     html,
   });
 };
+module.exports = sendEmail;
