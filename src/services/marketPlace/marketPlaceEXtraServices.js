@@ -1,8 +1,8 @@
-const Stock = require('@models/marketplace/stockModel.js');
-const Wishlist = require('@models/marketplace/wishlistModel.js');
-const Review = require('@models/marketplace/reviewModel.js');
-const Cart = require('@models/marketplace/cartModel.js');
-const CartItem = require('@models/marketplace/cartItemModel.js');
+const Stock = require('@models/marketPlace/stockModel.js');
+const Wishlist = require('@models/marketPlace/wishlistModel.js');
+const Review = require('@models/marketPlace/reviewModel.js');
+const Cart = require('@models/marketPlace/cartModel.js');
+const CartItem = require('@models/marketPlace/cartItemModel.js');
 
 // STOCK
 const getStockByProduct = async (product_id) => await Stock.findOne({ product_id });
