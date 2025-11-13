@@ -1,7 +1,7 @@
-const Shop = require('@models/marketplace/shopModel.js');
-const Product = require('@models/marketplace/productModel.js');
-const Order = require('@models/marketplace/orderModel.js');
-const OrderItem = require('@models/marketplace/orderItemModel.js');
+const Shop = require('@models/marketPlace/shopModel.js');
+const Product = require('@models/marketPlace/productModel.js');
+const Order = require('@models/marketPlace/orderModel.js');
+const OrderItem = require('@models/marketPlace/orderItemModel.js');
 
 
  const createShop = async (data) => await Shop.create(data);
