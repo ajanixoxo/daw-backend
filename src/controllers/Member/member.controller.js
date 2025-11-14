@@ -1,4 +1,4 @@
-import MemberService from "../../services/member.service.js";
+const MemberService = require("../../services/member.service.js");
 
 /**
  * Controller goals:
@@ -8,7 +8,7 @@ import MemberService from "../../services/member.service.js";
  * - get: single member
  */
 
-export const join = async (req, res) => {
+const join = async (req, res) => {
   try {
     const member = await MemberService.joinCooperative(req.body);
     return res.status(201).json({ message: "Joined", member });
@@ -17,7 +17,7 @@ export const join = async (req, res) => {
   }
 };
 
-export const approve = async (req, res) => {
+const approve = async (req, res) => {
   try {
     const member = await MemberService.updateStatus(req.params.id, "active");
     return res.json({ message: "Approved", member });
@@ -26,7 +26,7 @@ export const approve = async (req, res) => {
   }
 };
 
-export const listMembers = async (req, res) => {
+const listMembers = async (req, res) => {
   try {
     const members = await MemberService.getMembers(req.params.cooperativeId);
     return res.json(members);
@@ -35,7 +35,7 @@ export const listMembers = async (req, res) => {
   }
 };
 
-export const getMember = async (req, res) => {
+const getMember = async (req, res) => {
   try {
     const member = await MemberService.getById(req.params.id);
     if (!member) return res.status(404).json({ error: "Not found" });
@@ -43,4 +43,11 @@ export const getMember = async (req, res) => {
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
+};
+
+module.exports = {
+  join,
+  approve,
+  listMembers,
+  getMember
 };

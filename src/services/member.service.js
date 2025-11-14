@@ -1,6 +1,6 @@
-import Member from "../models/memberModel/member.model.js";
-import SubscriptionTier from "../models/subscriptionTierModel/subscriptionTier.model.js";
-import Cooperative from "../models/cooperativeModel/cooperative.model.js";
+const Member = require("../models/memberModel/member.model.js");
+const SubscriptionTier = require("../models/subscriptionTierModel/subscriptionTier.model.js");
+const Cooperative = require("../models/cooperativeModel/cooperative.model.js");
 
 /**
  * Service goals:
@@ -9,7 +9,7 @@ import Cooperative from "../models/cooperativeModel/cooperative.model.js";
  * - attach member id to Cooperative.members
  */
 
-export default {
+module.exports = {
   async joinCooperative({ userId, cooperativeId, subscriptionTierId }) {
     // validate
     const coop = await Cooperative.findById(cooperativeId);

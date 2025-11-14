@@ -1,5 +1,5 @@
-import Cooperative from "../models/cooperativeModel/cooperative.model.js";
-import SubscriptionTier from "../models/subscriptionTierModel/subscriptionTier.model.js";
+const Cooperative = require("../models/cooperativeModel/cooperative.model.js");
+const SubscriptionTier = require("../models/subscriptionTierModel/subscriptionTier.model.js");
 
 /**
  * Service goals:
@@ -7,7 +7,7 @@ import SubscriptionTier from "../models/subscriptionTierModel/subscriptionTier.m
  * - link tiers, ensure name uniqueness, return populated objects
  */
 
-export default {
+module.exports = {
   async createCooperative(data) {
     const exists = await Cooperative.findOne({ name: data.name });
     if (exists) throw new Error("Cooperative name already exists");

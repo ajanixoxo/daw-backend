@@ -1,6 +1,6 @@
-import cron from "node-cron";
-import Member from "../models/memberModel/member.model.js";
-import ContributionService from "../services/contribution.service.js";
+const cron = require("node-cron");
+const Member = require("../models/memberModel/member.model.js");
+const ContributionService = require("../services/contribution.service.js");
 
 /**
  * Cron goals:
@@ -11,7 +11,7 @@ import ContributionService from "../services/contribution.service.js";
  * '5 0 1 * *' -> at 00:05 on day-of-month 1
  */
 
-export function startCronJobs() {
+function startCronJobs() {
   cron.schedule("5 0 1 * *", async () => {
     try {
       console.log("Monthly contribution cron started");
@@ -23,3 +23,5 @@ export function startCronJobs() {
     }
   });
 }
+
+module.exports = { startCronJobs };

@@ -1,4 +1,4 @@
-import TierService from "../../services/tier.service.js";
+const TierService = require("../../services/tier.service.js");
 
 /**
  * Controller goals:
@@ -7,7 +7,7 @@ import TierService from "../../services/tier.service.js";
  * - updateTier: Update tier details
  */
 
-export const createTier = async (req, res) => {
+const createTier = async (req, res) => {
   try {
     const tier = await TierService.createTier(req.body);
     return res.status(201).json({ tier });
@@ -16,7 +16,7 @@ export const createTier = async (req, res) => {
   }
 };
 
-export const listTiers = async (req, res) => {
+const listTiers = async (req, res) => {
   try {
     const tiers = await TierService.getTiers(req.params.cooperativeId);
     return res.json(tiers);
@@ -25,11 +25,17 @@ export const listTiers = async (req, res) => {
   }
 };
 
-export const updateTier = async (req, res) => {
+const updateTier = async (req, res) => {
   try {
     const tier = await TierService.updateTier(req.params.id, req.body);
     return res.json({ tier });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
+};
+
+module.exports = {
+  createTier,
+  listTiers,
+  updateTier
 };

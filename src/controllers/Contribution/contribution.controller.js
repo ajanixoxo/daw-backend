@@ -1,4 +1,4 @@
-import ContributionService from "../../services/contribution.service.js";
+const ContributionService = require("../../services/contribution.service.js");
 
 /**
  * Controller goals:
@@ -7,7 +7,7 @@ import ContributionService from "../../services/contribution.service.js";
  * - mark payment as received (update status + transaction info)
  */
 
-export const createContribution = async (req, res) => {
+const createContribution = async (req, res) => {
   try {
     const c = await ContributionService.createContribution(req.body);
     return res.status(201).json({ contribution: c });
@@ -16,7 +16,7 @@ export const createContribution = async (req, res) => {
   }
 };
 
-export const listByMember = async (req, res) => {
+const listByMember = async (req, res) => {
   try {
     const list = await ContributionService.getMemberContributions(req.params.memberId);
     return res.json(list);
@@ -25,11 +25,17 @@ export const listByMember = async (req, res) => {
   }
 };
 
-export const markPaid = async (req, res) => {
+const markPaid = async (req, res) => {
   try {
     const updated = await ContributionService.markPaid(req.params.id, req.body);
     return res.json({ contribution: updated });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
+};
+
+module.exports = {
+  createContribution,
+  listByMember,
+  markPaid
 };

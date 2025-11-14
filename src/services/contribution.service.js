@@ -1,5 +1,5 @@
-import Contribution from "../models/contributionModel/contribution.model.js";
-import Member from "../models/memberModel/member.model.js";
+const Contribution = require("../models/contributionModel/contribution.model.js");
+const Member = require("../models/memberModel/member.model.js");
 
 /**
  * Service goals:
@@ -8,7 +8,7 @@ import Member from "../models/memberModel/member.model.js";
  * - mark contribution as paid and append to member.paymentHistory
  */
 
-export default {
+module.exports = {
   async createContribution({ memberId, cooperativeId, amount, month }) {
     // ensure record uniqueness for member-month if desired
     const exists = await Contribution.findOne({ memberId, month });

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const ContributionSchema = new mongoose.Schema(
   {
@@ -35,4 +35,4 @@ const Contribution = mongoose.model(
   ContributionSchema
 );
 
-export default Contribution;
+module.exports = Contribution;

@@ -12,7 +12,8 @@
     "@services": "src/services",
     "@utils": "src/utils",
     "@routes": "src/routes",
-    "@config":"src/config"
+    "@config": "src/config",
+    "@jobs": "src/jobs"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

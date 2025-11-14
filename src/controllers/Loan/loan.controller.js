@@ -1,4 +1,4 @@
-import LoanService from "../../services/loan.service.js";
+const LoanService = require("../../services/loan.service.js");
 
 /**
  * Controller goals:
@@ -7,7 +7,7 @@ import LoanService from "../../services/loan.service.js";
  * - listLoans: member's loans
  */
 
-export const applyForLoan = async (req, res) => {
+const applyForLoan = async (req, res) => {
   try {
     const loan = await LoanService.applyForLoan(req.body);
     return res.status(201).json({ loan });
@@ -16,7 +16,7 @@ export const applyForLoan = async (req, res) => {
   }
 };
 
-export const approveLoan = async (req, res) => {
+const approveLoan = async (req, res) => {
   try {
     const loan = await LoanService.approve(req.params.id, req.body);
     return res.json({ loan });
@@ -25,11 +25,17 @@ export const approveLoan = async (req, res) => {
   }
 };
 
-export const listMemberLoans = async (req, res) => {
+const listMemberLoans = async (req, res) => {
   try {
     const loans = await LoanService.getByMember(req.params.memberId);
     return res.json({ loans });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
+};
+
+module.exports = {
+  applyForLoan,
+  approveLoan,
+  listMemberLoans
 };

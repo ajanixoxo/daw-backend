@@ -1,10 +1,11 @@
-import express from "express";
-import {
+const express = require("express");
+const {
   join,
   approve,
   listMembers,
   getMember
-} from "../../controllers/Member/member.controller.js";
+} = require("../../controllers/Member/member.controller.js");
+const { protect, restrictTo } = require("@middlewares/authMiddleware.js");
 
 const router = express.Router();
 
@@ -13,4 +14,4 @@ router.put("/:id/approve", protect, restrictTo("admin,cooperative_admin"), appro
 router.get("/cooperative/:cooperativeId", protect, restrictTo("admin,cooperative_admin"), listMembers);
 router.get("/:id", protect, restrictTo("admin,cooperative_admin"), getMember);
 
-export default router;
+module.exports = router;

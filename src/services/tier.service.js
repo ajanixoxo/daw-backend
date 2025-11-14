@@ -1,5 +1,5 @@
-import SubscriptionTier from "../models/subscriptionTierModel/subscriptionTier.model.js";
-import Cooperative from "../models/cooperativeModel/cooperative.model.js";
+const SubscriptionTier = require("../models/subscriptionTierModel/subscriptionTier.model.js");
+const Cooperative = require("../models/cooperativeModel/cooperative.model.js");
 
 /**
  * Service goals:
@@ -7,7 +7,7 @@ import Cooperative from "../models/cooperativeModel/cooperative.model.js";
  * - create / update tier documents
  */
 
-export default {
+module.exports = {
   async createTier(data) {
     const coop = await Cooperative.findById(data.cooperativeId);
     if (!coop) throw new Error("Cooperative not found");

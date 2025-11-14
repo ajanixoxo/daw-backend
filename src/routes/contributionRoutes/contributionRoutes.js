@@ -1,9 +1,9 @@
-import express from "express";
-import {
+const express = require("express");
+const {
   createContribution,
   listByMember,
   markPaid
-} from "../../controllers/Contribution/contribution.controller.js";
+} = require("../../controllers/Contribution/contribution.controller.js");
 
 const router = express.Router();
 
@@ -11,4 +11,4 @@ router.post("/", createContribution);
 router.get("/member/:memberId", listByMember);
 router.put("/:id/mark-paid", markPaid);
 
-export default router;
+module.exports = router;

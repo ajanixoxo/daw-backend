@@ -1,4 +1,4 @@
-import CoopService from "../../services/cooperative.service.js";
+const CoopService = require("../../services/cooperative.service.js");
 
 /**
  * Controller goals:
@@ -8,7 +8,7 @@ import CoopService from "../../services/cooperative.service.js";
  * - updateCooperative: Update org metadata.
  */
 
-export const createCooperative = async (req, res) => {
+const createCooperative = async (req, res) => {
   try {
     const cooperative = await CoopService.createCooperative(req.body);
     return res.status(201).json({ message: "Cooperative created", cooperative });
@@ -17,7 +17,7 @@ export const createCooperative = async (req, res) => {
   }
 };
 
-export const getCooperative = async (req, res) => {
+const getCooperative = async (req, res) => {
   try {
     const cooperative = await CoopService.getCooperative(req.params.id);
     if (!cooperative) return res.status(404).json({ error: "Not found" });
@@ -27,7 +27,7 @@ export const getCooperative = async (req, res) => {
   }
 };
 
-export const listCooperatives = async (req, res) => {
+const listCooperatives = async (req, res) => {
   try {
     const cooperatives = await CoopService.getAll(req.query);
     return res.json(cooperatives);
@@ -36,11 +36,18 @@ export const listCooperatives = async (req, res) => {
   }
 };
 
-export const updateCooperative = async (req, res) => {
+const updateCooperative = async (req, res) => {
   try {
     const updated = await CoopService.updateCooperative(req.params.id, req.body);
     return res.json({ message: "Updated", cooperative: updated });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
+};
+
+module.exports = {
+  createCooperative,
+  getCooperative,
+  listCooperatives,
+  updateCooperative
 };

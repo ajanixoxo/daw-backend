@@ -1,9 +1,9 @@
-import express from "express";
-import {
+const express = require("express");
+const {
   applyForLoan,
   approveLoan,
   listMemberLoans
-} from "../../controllers/Loan/loan.controller.js";
+} = require("../../controllers/Loan/loan.controller.js");
 
 const router = express.Router();
 
@@ -11,4 +11,4 @@ router.post("/apply", applyForLoan);
 router.put("/:id/approve", approveLoan);
 router.get("/member/:memberId", listMemberLoans);
 
-export default router;
+module.exports = router;

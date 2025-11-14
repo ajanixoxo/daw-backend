@@ -7,13 +7,13 @@ const connectDB = require('@config/db.js');
 const marketPlaceRoutes = require('@routes/marketPlaceRoutes/marketplaceRoutes.js')
 const extraMarketPlaceRoutes = require('@routes/marketPlaceRoutes/marketplaceExtraRoutes.js');
 const AppError = require('@utils/Error/AppError.js');
-import cooperativeRoutes from './src/routes/cooperativeRoutes/cooperativeRoutes.js';
-import tierRoutes from './src/routes/tierRoutes/tierRoutes.js';
-import memberRoutes from './src/routes/memberRoutes/memberRoutes.js';
-import contributionRoutes from './src/routes/contributionRoutes/contributionRoutes.js';
-import loanRoutes from './src/routes/loanRoutes/loanRoutes.js';
-import connectDB from './src/config/db.js';
-import { startCronJobs } from './src/jobs/monthlyContribution.cron.js'; 
+const cooperativeRoutes = require('@routes/cooperativeRoutes/cooperativeRoutes.js');
+const tierRoutes = require('@routes/tierRoutes/tierRoutes.js');
+const memberRoutes = require('@routes/memberRoutes/memberRoutes.js');
+const contributionRoutes = require('@routes/contributionRoutes/contributionRoutes.js');
+const loanRoutes = require('@routes/loanRoutes/loanRoutes.js');
+
+const { startCronJobs } = require('@jobs/monthlyContribution.cron.js'); 
 
 
 

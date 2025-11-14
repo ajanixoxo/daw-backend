@@ -1,7 +1,7 @@
-import Loan from "../models/loanModel/loan.model.js";
-import Member from "../models/memberModel/member.model.js";
-import SubscriptionTier from "../models/subscriptionTierModel/subscriptionTier.model.js";
-import Contribution from "../models/contributionModel/contribution.model.js";
+const Loan = require("../models/loanModel/loan.model.js");
+const Member = require("../models/memberModel/member.model.js");
+const SubscriptionTier = require("../models/subscriptionTierModel/subscriptionTier.model.js");
+const Contribution = require("../models/contributionModel/contribution.model.js");
 
 /**
  * Service goals:
@@ -10,7 +10,7 @@ import Contribution from "../models/contributionModel/contribution.model.js";
  * - admin approves (status changed and disbursement handled elsewhere)
  */
 
-export default {
+module.exports = {
   async applyForLoan({ memberId, amount, durationMonths, purpose }) {
     const member = await Member.findById(memberId).populate("subscriptionTierId").lean();
     if (!member) throw new Error("Member not found");

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const SubscriptionTierSchema = new mongoose.Schema(
   {
@@ -43,4 +43,4 @@ const SubscriptionTier = mongoose.model(
   SubscriptionTierSchema
 );
 
-export default SubscriptionTier;
+module.exports = SubscriptionTier;

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const CooperativeSchema = new mongoose.Schema(
   {
@@ -30,4 +30,4 @@ const CooperativeSchema = new mongoose.Schema(
 );
 
 const Cooperative = mongoose.model("Cooperative", CooperativeSchema);
-export default Cooperative;
+module.exports = Cooperative;
