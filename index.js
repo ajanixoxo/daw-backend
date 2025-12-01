@@ -54,7 +54,12 @@ app.use(cors(corsOptions));
 
 app.use('/auth', authRoutes);
 
-app.use('/users', userRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/cooperatives', cooperativeRoutes);
+app.use('/api/tiers', tierRoutes);
+app.use('/api/members', memberRoutes);
+app.use('/api/contributions', contributionRoutes);
+app.use('/api/loans', loanRoutes);
 
 app.use('/marketplace', marketPlaceRoutes);
 app.use('/marketplace', extraMarketPlaceRoutes);

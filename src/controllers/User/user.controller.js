@@ -15,10 +15,8 @@ const upgradeToSeller = asyncHandler(async (req, res) => {
       throw new AppError('User not found', 404);
     }
 
-    // Get current roles array with backward compatibility
-    let currentRoles = Array.isArray(User.roles) && User.roles.length > 0 
-      ? User.roles 
-      : (User.role ? [User.role] : ['buyer']);
+    // Get current roles array
+    const currentRoles = Array.isArray(User.roles) ? User.roles : [];
 
     // Only add "seller" if it's not already present
     if (!currentRoles.includes('seller')) {
@@ -57,10 +55,8 @@ const upgradeToCooperative = asyncHandler(async (req, res) => {
       throw new AppError('User not found', 404);
     }
 
-    // Get current roles array with backward compatibility
-    let currentRoles = Array.isArray(User.roles) && User.roles.length > 0 
-      ? User.roles 
-      : (User.role ? [User.role] : ['buyer']);
+    // Get current roles array
+    const currentRoles = Array.isArray(User.roles) ? User.roles : [];
 
     // Only add "cooperative" if it's not already present
     if (!currentRoles.includes('cooperative')) {

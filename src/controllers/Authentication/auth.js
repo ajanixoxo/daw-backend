@@ -11,7 +11,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
 
  const registerUser = asyncHandler(async (req, res) => {
   try {
-    const { firstName, lastName, email, password, confirmPassword, phone, role } = req.body;
+    const { firstName, lastName, email, password, confirmPassword, phone, roles } = req.body;
 
     if (!firstName || !email || !password || !phone) {
       throw new AppError('All fields are required', 400);
@@ -26,15 +26,23 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
       throw new AppError('User already exists', 400);
     }
 
-    // New users default to roles: ["buyer"], but can accept role for backward compatibility
+    // Handle roles: accept array or single string, convert to array
+    let userRoles = [];
+    if (roles) {
+      userRoles = Array.isArray(roles) ? roles : [roles];
+    }
+
+    if (userRoles.length === 0) {
+      throw new AppError('Roles are required', 400);
+    }
+
     const newUser = await user.create({
       firstName,
       lastName,
       email,
       password,
       phone,
-      roles: ['buyer'], // Default to buyer role
-      // ...(role && { role }), // Include role if provided for backward compatibility
+      roles: userRoles,
     });
 
     const { accessToken, refreshToken } = await newUser.generateToken();
@@ -44,11 +52,6 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
 
     const verificationLink = `${FRONTEND_URL}/auth/verify/email/${accessToken}`;
     await verificationEmailTemplate(newUser.email, newUser.firstName, verificationLink);
-
-    // Get roles array with backward compatibility
-    const userRoles = Array.isArray(newUser.roles) && newUser.roles.length > 0 
-      ? newUser.roles 
-      : (newUser.role ? [newUser.role] : ['buyer']);
 
     res.status(201).json({
       success: true,
@@ -60,7 +63,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
         email: newUser.email,
         phone: newUser.phone,
         verified: newUser.isVerified,
-        roles: userRoles,
+        roles: newUser.roles,
       },
       token: {
         accessToken,

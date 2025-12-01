@@ -79,7 +79,6 @@ const UserSchema = new mongoose.Schema({
         type: [String],
         enum: ['buyer', 'seller', 'admin', 'cooperative', 
             'member', 'logistics_provider'],
-        default: ['buyer'],
         required: true
     },
 
@@ -111,18 +110,6 @@ const UserSchema = new mongoose.Schema({
 },{ timestamps: true});
 
 
-// Backward compatibility: Convert single role to roles array if roles is not set
-UserSchema.pre('save', async function(next){
-    // If roles is not set or empty, and role exists, convert role to roles array
-    if ((!this.roles || this.roles.length === 0) && this.role) {
-        this.roles = [this.role];
-    }
-    // If roles is not set and role is also not set, default to ['buyer']
-    if (!this.roles || this.roles.length === 0) {
-        this.roles = ['buyer'];
-    }
-    next();
-});
 
 UserSchema.pre('save', async function(next){
     if (!this.isModified('password')) return next();
