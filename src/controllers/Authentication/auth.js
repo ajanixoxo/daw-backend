@@ -13,7 +13,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
   try {
     const { firstName, lastName, email, password, confirmPassword, phone, role } = req.body;
 
-    if (!firstName || !email || !password || !phone || !role) {
+    if (!firstName || !email || !password || !phone) {
       throw new AppError('All fields are required', 400);
     }
 
@@ -26,13 +26,15 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
       throw new AppError('User already exists', 400);
     }
 
+    // New users default to roles: ["buyer"], but can accept role for backward compatibility
     const newUser = await user.create({
       firstName,
       lastName,
       email,
       password,
       phone,
-      role,
+      roles: ['buyer'], // Default to buyer role
+      // ...(role && { role }), // Include role if provided for backward compatibility
     });
 
     const { accessToken, refreshToken } = await newUser.generateToken();
@@ -42,6 +44,11 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
 
     const verificationLink = `${FRONTEND_URL}/auth/verify/email/${accessToken}`;
     await verificationEmailTemplate(newUser.email, newUser.firstName, verificationLink);
+
+    // Get roles array with backward compatibility
+    const userRoles = Array.isArray(newUser.roles) && newUser.roles.length > 0 
+      ? newUser.roles 
+      : (newUser.role ? [newUser.role] : ['buyer']);
 
     res.status(201).json({
       success: true,
@@ -53,7 +60,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
         email: newUser.email,
         phone: newUser.phone,
         verified: newUser.isVerified,
-        role: newUser.role,
+        roles: userRoles,
       },
       token: {
         accessToken,
@@ -187,12 +194,29 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
 
     const { accessToken, refreshToken } = await User.generateToken();
 
-    User.password = undefined;
-    User.verificationToken = undefined;
+    // Get roles array with backward compatibility
+    const userRoles = Array.isArray(User.roles) && User.roles.length > 0 
+      ? User.roles 
+      : (User.role ? [User.role] : ['buyer']);
+
+    // Prepare user object with roles
+    const userResponse = {
+      _id: User._id,
+      firstName: User.firstName,
+      lastName: User.lastName,
+      email: User.email,
+      phone: User.phone,
+      isVerified: User.isVerified,
+      roles: userRoles,
+      status: User.status,
+      kyc_status: User.kyc_status,
+      createdAt: User.createdAt,
+      updatedAt: User.updatedAt
+    };
 
     res.status(200).json({
       message: "Login successful",
-      user: User,
+      user: userResponse,
       token: { accessToken, refreshToken },
     });
   } catch (error) {

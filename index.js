@@ -12,6 +12,7 @@ const tierRoutes = require('@routes/tierRoutes/tierRoutes.js');
 const memberRoutes = require('@routes/memberRoutes/memberRoutes.js');
 const contributionRoutes = require('@routes/contributionRoutes/contributionRoutes.js');
 const loanRoutes = require('@routes/loanRoutes/loanRoutes.js');
+const userRoutes = require('@routes/userRoutes/userRoutes.js');
 
 const { startCronJobs } = require('@jobs/monthlyContribution.cron.js'); 
 
@@ -52,6 +53,8 @@ app.use(cors(corsOptions));
 
 
 app.use('/auth', authRoutes);
+
+app.use('/users', userRoutes);
 
 app.use('/marketplace', marketPlaceRoutes);
 app.use('/marketplace', extraMarketPlaceRoutes);

@@ -8,8 +8,8 @@ const { protect, restrictTo } = require("@middlewares/authMiddleware.js");
 
 const router = express.Router();
 
-router.post("/", protect, restrictTo("admin,cooperative_admin"), createTier);
-router.get("/cooperative/:cooperativeId", protect, restrictTo("admin,registered_shopper,seller"), listTiers);
-router.put("/:id", protect, restrictTo("admin,cooperative_admin"), updateTier);
+router.post("/", protect, restrictTo("admin,cooperative"), createTier);
+router.get("/cooperative/:cooperativeId", protect, restrictTo("admin,buyer,seller"), listTiers);
+router.put("/:id", protect, restrictTo("admin,cooperative"), updateTier);
 
 module.exports = router;
