@@ -69,7 +69,7 @@ const registerUser = asyncHandler(async (req, res) => {
         email: newUser.email,
         phone: newUser.phone,
         verified: newUser.isVerified,
-        role: newUser.role,
+        roles: newUser.roles,
       },
     });
   } catch (error) {

@@ -7,6 +7,16 @@ const connectDB = require('@config/db.js');
 const marketPlaceRoutes = require('@routes/marketPlaceRoutes/marketplaceRoutes.js')
 const extraMarketPlaceRoutes = require('@routes/marketPlaceRoutes/marketplaceExtraRoutes.js');
 const AppError = require('@utils/Error/AppError.js');
+const cooperativeRoutes = require('@routes/cooperativeRoutes/cooperativeRoutes.js');
+const tierRoutes = require('@routes/tierRoutes/tierRoutes.js');
+const memberRoutes = require('@routes/memberRoutes/memberRoutes.js');
+const contributionRoutes = require('@routes/contributionRoutes/contributionRoutes.js');
+const loanRoutes = require('@routes/loanRoutes/loanRoutes.js');
+const userRoutes = require('@routes/userRoutes/userRoutes.js');
+
+const { startCronJobs } = require('@jobs/monthlyContribution.cron.js'); 
+
+
 
 
 
@@ -44,6 +54,13 @@ app.use(cors(corsOptions));
 
 app.use('/auth', authRoutes);
 
+app.use('/api/users', userRoutes);
+app.use('/api/cooperatives', cooperativeRoutes);
+app.use('/api/tiers', tierRoutes);
+app.use('/api/members', memberRoutes);
+app.use('/api/contributions', contributionRoutes);
+app.use('/api/loans', loanRoutes);
+
 app.use('/marketplace', marketPlaceRoutes);
 app.use('/marketplace', extraMarketPlaceRoutes);
 
@@ -66,4 +83,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
     console.log(`server is running on PORT ${PORT}`);
+    startCronJobs();
+    console.log("Cron jobs started");
 })
