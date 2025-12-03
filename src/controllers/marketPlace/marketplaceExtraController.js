@@ -1,5 +1,5 @@
 const asyncHandler = require("express-async-handler");
-const marketplaceService = require("@services/marketPlace/marketPlaceExtraServices.js");
+const marketplaceService = require("@services/marketPlace/marketPlaceEXtraServices.js");
 
 // STOCK
 const getStock = asyncHandler(async (req, res) => {

@@ -13,11 +13,20 @@ const protect = (req, res, next) => {
   }
 };
 
-const restrictTo = (...roles) => {
+const restrictTo = (...allowedRoles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ message: "Forbidden: insufficient permissions" });
+    const userRoles = Array.isArray(req.user.roles)
+      ? req.user.roles
+      : [req.user.role]; // backward compatibility
+
+    const isAllowed = userRoles.some(role => allowedRoles.includes(role));
+
+    if (!isAllowed) {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: insufficient permissions" });
     }
+
     next();
   };
 };

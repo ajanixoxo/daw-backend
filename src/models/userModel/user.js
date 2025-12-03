@@ -67,11 +67,19 @@ const UserSchema = new mongoose.Schema({
         default: 'pending'
     },
 
-    role: {
-        type: String,
-        enum: ['member', 'cooperative_Shopper', 'admin', 'registered_shopper', 
-            'seller','cooperative_Seller' , 'store_manager', 'logistics_provider'],
-        default: 'member'
+    // role: {
+    //     type: String,
+    //     enum: ['member', 'cooperative_Shopper', 'admin', 'cooperative', 'buyer', 
+    //         'seller','cooperative_Seller' , 'store_manager', 'logistics_provider'],
+    //     default: 'member',
+    //     required: false
+    // },
+
+    roles: {
+        type: [String],
+        enum: ['buyer', 'seller', 'admin', 'cooperative', 
+            'member', 'logistics_provider'],
+        required: true
     },
 
     status: {
@@ -102,6 +110,7 @@ const UserSchema = new mongoose.Schema({
 },{ timestamps: true});
 
 
+
 UserSchema.pre('save', async function(next){
     if (!this.isModified('password')) return next();
     const salt = await bcrypt.genSalt(saltRounds);
@@ -114,12 +123,17 @@ UserSchema.methods.comparePassword = async function(Enteredpassword){
 };
 
 UserSchema.methods.generateToken = async function(){
+    // Get roles array, with backward compatibility
+    const userRoles = Array.isArray(this.roles) && this.roles.length > 0 
+        ? this.roles 
+        : (this.role ? [this.role] : ['buyer']);
+    
     const accessToken =  jwt.sign(
         {
         _id: this._id, 
         firstName: this.firstName, 
         email: this.email,
-        role: this.role, 
+        roles: userRoles, 
         status: this.status
         },
         jwtsecret,
