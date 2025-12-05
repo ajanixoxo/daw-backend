@@ -3,7 +3,7 @@ const asyncHandler = require("express-async-handler");
 const AppError = require("@utils/Error/AppError.js");
 const {
   verificationEmailTemplate,
-  loginOTPEmailTemplate
+  loginOTPEmailTemplate,
 } = require("@utils/EmailTemplate/template.js");
 const jwt = require("jsonwebtoken");
 
@@ -114,7 +114,6 @@ const verifyEmail = asyncHandler(async (req, res) => {
   }
 });
 
-
 const resendEmailVerificationOTP = asyncHandler(async (req, res) => {
   try {
     const { email } = req.body;
@@ -223,13 +222,17 @@ async function login(req, res) {
   }
 }
 
-
 async function loginOTP(req, res) {
   try {
     const userId = req.user._id;
-    const { otp } = req.body;
-
-    const User = await user.findOne({ _id: userId });  
+    const { otp } = req.body || {};
+    console.log("otp", otp);
+    if (!otp) {
+      return res.status(400).json({
+        message: "OTP is required",
+      });
+    }
+    const User = await user.findOne({ _id: userId }).select("+otp +otpExpiry");
     if (!User) {
       return res.status(400).json({ error: "Invalid or expired token." });
     }
@@ -239,7 +242,9 @@ async function loginOTP(req, res) {
     }
 
     if (User.otpExpiry < Date.now()) {
-      return res.status(400).json({ error: "OTP expired. Please request a new one." });
+      return res
+        .status(400)
+        .json({ error: "OTP expired. Please request a new one." });
     }
 
     const { accessToken, refreshToken } = await User.generateToken();
@@ -257,7 +262,6 @@ async function loginOTP(req, res) {
       },
       user: User,
     });
-
   } catch (error) {
     console.error("Error in verifying OTP:", error);
     res.status(500).json({ message: "Internal server error" });
@@ -270,5 +274,5 @@ module.exports = {
   resendEmailVerificationOTP,
   refreshAccessToken,
   login,
-  loginOTP
+  loginOTP,
 };

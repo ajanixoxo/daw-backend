@@ -13,8 +13,9 @@ const memberRoutes = require('@routes/memberRoutes/memberRoutes.js');
 const contributionRoutes = require('@routes/contributionRoutes/contributionRoutes.js');
 const loanRoutes = require('@routes/loanRoutes/loanRoutes.js');
 const userRoutes = require('@routes/userRoutes/userRoutes.js');
-
+const paymentRoute = require('@routes/paymentRoute/payment.route.js');
 const { startCronJobs } = require('@jobs/monthlyContribution.cron.js'); 
+const { addPath } = require('module-alias');
 
 
 
@@ -63,6 +64,8 @@ app.use('/api/loans', loanRoutes);
 
 app.use('/marketplace', marketPlaceRoutes);
 app.use('/marketplace', extraMarketPlaceRoutes);
+
+app.use('/api', paymentRoute);
 
 app.get('/', (req,res) => {
     res.send("Welcome to the DAW application!");
