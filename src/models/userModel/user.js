@@ -49,11 +49,12 @@ const UserSchema = new mongoose.Schema({
 
     otp: { 
         type: String,
-        select: false 
+        select: false
     },
 
-    otpExpires: { 
-        type: Date 
+    otpExpiry: { 
+        type: Date,
+        select: false 
     },
 
     isVerified: {
