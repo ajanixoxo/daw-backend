@@ -154,15 +154,15 @@ UserSchema.methods.generateToken = async function(){
     return { accessToken, refreshToken };
 }
 
-// UserSchema.methods.generateRefreshToken = async function(){
-    // return jwt.sign(
-    //     {_id: this._id},
-    //     jwtsecret,
-    //     {
-    //         expiresIn : "15d"
-    //     }
-    // )
-// }
+UserSchema.methods.generateRefreshToken = async function(){
+    return jwt.sign(
+        {_id: this._id},
+        jwtsecret,
+        {
+            expiresIn : "15d"
+        }
+    )
+}
 
 
 const user = mongoose.model("User", UserSchema);
