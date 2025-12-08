@@ -91,34 +91,28 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 });
 
-const verifyEmail = asyncHandler(async (req, res) => {
+const verifyEmail = asyncHandler(async (req, res, next) => {
   try {
     const userId = req.user._id;
     const { otp } = req.body;
 
     if (!otp) {
-      return res.status(400).json({
-        message: "OTP is required",
-      });
+      return res.status(400).json({ message: "OTP is required" });
     }
 
-    const User = await user.findOne({ _id: userId });
-    if (!User) {
-      return res.status(400).json({ error: "Invalid or expired token." });
-    }
+    const User = await user.findById(userId).select("+otp +otpExpiry");
+    if (!User) return next(new AppError("Invalid user", 400));
 
     if (User.isVerified) {
-      return res.status(400).json({
-        message: "User already verified",
-      });
+      return res.status(400).json({ message: "User already verified" });
     }
 
     if (User.otp !== otp) {
-      throw new AppError("Invalid OTP", 400);
+      return next(new AppError("Invalid OTP", 400));
     }
 
     if (User.otpExpiry < Date.now()) {
-      throw new AppError("OTP expired. Please request a new one.", 400);
+      return next(new AppError("OTP expired. Please request a new one.", 400));
     }
 
     User.isVerified = true;
@@ -126,12 +120,15 @@ const verifyEmail = asyncHandler(async (req, res) => {
     User.otpExpiry = null;
     await User.save();
 
-    res.json({ message: "Email verified successfully. You can now log in." });
+    return res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
+    });
   } catch (error) {
-    console.error("Error verifying email:", error.message);
-    throw new AppError("Error verifying email", 500);
+    return next(error);
   }
 });
+
 
 const resendEmailVerificationOTP = asyncHandler(async (req, res) => {
   try {
