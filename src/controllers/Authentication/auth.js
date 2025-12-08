@@ -75,9 +75,19 @@ const registerUser = asyncHandler(async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error in registering user:", error.message);
-    throw new AppError("Error during register user", 500);
-  }
+    console.error("Error in registering user:", error);
+
+    
+    let errorMsg = error?.errors
+        ? Object.values(error.errors).map(err => err.message).join(", ")
+        : error.message;
+
+    return res.status(400).json({
+        success: false,
+        status: "error",
+        message: errorMsg || "Error during register user"
+    });
+}
 });
 
 const verifyEmail = asyncHandler(async (req, res) => {
