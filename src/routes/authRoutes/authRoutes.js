@@ -13,7 +13,7 @@ const router = express.Router();
 
 router.post('/register', registerUser);
 
-router.get('/verify/email', protect, verifyEmail);
+router.post('/verify/email', protect, verifyEmail);
 
 router.post('/resend/verificatiion', resendEmailVerificationOTP);
 
