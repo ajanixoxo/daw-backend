@@ -14,7 +14,8 @@ const contributionRoutes = require('@routes/contributionRoutes/contributionRoute
 const loanRoutes = require('@routes/loanRoutes/loanRoutes.js');
 const userRoutes = require('@routes/userRoutes/userRoutes.js');
 const paymentRoute = require('@routes/paymentRoute/payment.route.js');
-const { startCronJobs } = require('@jobs/monthlyContribution.cron.js'); 
+const { startCronJobs } = require('@jobs/monthlyContribution.cron.js');
+const globalErrorHandler = require("./src/middlewares/errorMiddleware");
 const { addPath } = require('module-alias');
 
 
@@ -83,6 +84,12 @@ app.use((err, req, res, next) => {
     message: err.message || 'Internal Server Error',
   });
 });
+
+app.use((req, res, next) => {
+  next(new AppError(`Route not found: ${req.originalUrl}`, 404));
+});
+
+app.use(globalErrorHandler);
 
 app.listen(PORT, () => {
     console.log(`server is running on PORT ${PORT}`);
