@@ -35,7 +35,7 @@ const registerUser = asyncHandler(async (req, res) => {
     const existingUser = await user.findOne({ email });
     if (existingUser) {
       res.status(400).json({
-        message:"user already exist"
+        message: "user already exist",
       });
     }
 
@@ -77,23 +77,30 @@ const registerUser = asyncHandler(async (req, res) => {
   } catch (error) {
     console.error("Error in registering user:", error);
 
-    
     let errorMsg = error?.errors
-        ? Object.values(error.errors).map(err => err.message).join(", ")
-        : error.message;
+      ? Object.values(error.errors)
+          .map((err) => err.message)
+          .join(", ")
+      : error.message;
 
     return res.status(400).json({
-        success: false,
-        status: "error",
-        message: errorMsg || "Error during register user"
+      success: false,
+      status: "error",
+      message: errorMsg || "Error during register user",
     });
-}
+  }
 });
 
 const verifyEmail = asyncHandler(async (req, res) => {
   try {
     const userId = req.user._id;
     const { otp } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({
+        message: "OTP is required",
+      });
+    }
 
     const User = await user.findOne({ _id: userId });
     if (!User) {
@@ -102,7 +109,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
 
     if (User.isVerified) {
       return res.status(400).json({
-        message: "please verify your email",
+        message: "User already verified",
       });
     }
 
