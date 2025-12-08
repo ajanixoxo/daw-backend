@@ -34,7 +34,9 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const existingUser = await user.findOne({ email });
     if (existingUser) {
-      throw new AppError("User already exists", 400);
+      res.status(400).json({
+        message:"user already exist"
+      });
     }
 
     const otp = generateOTP();
@@ -90,7 +92,7 @@ const verifyEmail = asyncHandler(async (req, res) => {
 
     if (User.isVerified) {
       return res.status(400).json({
-        message: "User already verified",
+        message: "please verify your email",
       });
     }
 
@@ -157,7 +159,9 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     const User = await user.findById(decoded._id);
 
     if (!User) {
-      throw new AppError("User not found", 404);
+      return res.status(400).json({
+        message: "user already exist",
+      });
     }
 
     const { accessToken, refreshToken: newRefreshToken } =
@@ -190,11 +194,13 @@ async function login(req, res) {
     if (!User) return res.status(404).json({ message: "User not found" });
 
     const isMatched = await User.comparePassword(password);
-    if (!isMatched)
+    if (!isMatched) {
       return res.status(400).json({ message: "Invalid password" });
+    }
 
-    if (!User.isVerified)
+    if (!User.isVerified) {
       return res.status(400).json({ message: "Please verify your email" });
+    }
 
     const otp = generateOTP();
     User.otp = otp;
