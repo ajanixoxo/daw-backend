@@ -21,10 +21,10 @@ const registerUser = asyncHandler(async (req, res) => {
       password,
       confirmPassword,
       phone,
-      role,
+      roles,
     } = req.body;
 
-    if (!firstName || !email || !password || !phone || !role) {
+    if (!firstName || !email || !password || !phone || !roles) {
       throw new AppError("All fields are required", 400);
     }
 
@@ -48,7 +48,7 @@ const registerUser = asyncHandler(async (req, res) => {
       email,
       password,
       phone,
-      role,
+      roles,
       otp,
       otpExpiry,
     });
@@ -128,7 +128,6 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
     return next(error);
   }
 });
-
 
 const resendEmailVerificationOTP = asyncHandler(async (req, res) => {
   try {
@@ -230,6 +229,8 @@ async function login(req, res) {
     );
 
     User.password = undefined;
+    User.otp = undefined;
+    User.otpExpiry = undefined;
 
     res.status(200).json({
       message: "OTP sent to email. Please verify OTP to complete login.",
