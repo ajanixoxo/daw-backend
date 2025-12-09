@@ -47,6 +47,7 @@ const registerUser = asyncHandler(async (req, res) => {
       lastName,
       email,
       password,
+      isVerified:false,
       phone,
       roles,
       otp,
@@ -106,7 +107,7 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
     if (User.isVerified) {
       return res.status(400).json({ message: "User already verified" });
     }
-
+    
     if (User.otp !== otp) {
       return next(new AppError("Invalid OTP", 400));
     }
@@ -247,7 +248,6 @@ async function loginOTP(req, res) {
   try {
     const userId = req.user._id;
     const { otp } = req.body || {};
-    console.log("otp", otp);
     if (!otp) {
       return res.status(400).json({
         message: "OTP is required",
