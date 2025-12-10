@@ -5,7 +5,10 @@ const {
   resendEmailVerificationOTP,
   login,
   refreshAccessToken,
-  loginOTP
+  loginOTP,
+  logout,
+  forgotPassword,
+  resetPassword
 } = require('@controllers/Authentication/auth.js');
 const { protect } = require("@middlewares/authMiddleware.js");
 
@@ -22,5 +25,11 @@ router.post('/login', login);
 router.post('/login/otp', protect, loginOTP);
 
 router.post('/refresh/token', refreshAccessToken);
+
+router.post('/logout', protect, logout);
+
+router.post('/forgot/password', forgotPassword);
+
+router.post('/reset/password', protect, resetPassword);
 
 module.exports = router;

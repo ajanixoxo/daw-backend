@@ -4,6 +4,7 @@ const AppError = require("@utils/Error/AppError.js");
 const {
   verificationEmailTemplate,
   loginOTPEmailTemplate,
+  forgotPasswordOTPEmailTemplate,
 } = require("@utils/EmailTemplate/template.js");
 const jwt = require("jsonwebtoken");
 
@@ -94,25 +95,27 @@ const registerUser = asyncHandler(async (req, res) => {
     //   message: errorMsg || "Error during register user",
     // });
     if (error.code === 11000) {
-    const field = Object.keys(error.keyPattern)[0];
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({
+        success: false,
+        status: "error",
+        message: `${
+          field.charAt(0).toUpperCase() + field.slice(1)
+        } already in use`,
+      });
+    }
+
+    let errorMsg = error?.errors
+      ? Object.values(error.errors)
+          .map((err) => err.message)
+          .join(", ")
+      : error.message;
+
     return res.status(400).json({
       success: false,
       status: "error",
-      message: `${field.charAt(0).toUpperCase() + field.slice(1)} already in use`,
+      message: errorMsg || "Error during register user",
     });
-  }
-
-  let errorMsg = error?.errors
-    ? Object.values(error.errors)
-        .map((err) => err.message)
-        .join(", ")
-    : error.message;
-
-  return res.status(400).json({
-    success: false,
-    status: "error",
-    message: errorMsg || "Error during register user",
-  });
   }
 });
 
@@ -325,6 +328,96 @@ async function loginOTP(req, res) {
   }
 }
 
+async function logout(req, res) {
+  try {
+    const userId = req.user._id;
+    const User = await user.findById(userId).select("+refreshToken");
+    if (!User) {
+      return res.status(400).json({ message: "Invalid user" });
+    }
+
+    User.refreshToken = null;
+    await User.save();
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.error("Error in logout:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+    const User = await user.findOne({ email });
+    if (!User) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const otp = await generateOTP();
+    const otpExpiry = Date.now() + 10 * 60 * 1000;
+
+    User.otp = otp;
+    User.otpExpiry = otpExpiry;
+    await User.save();
+
+    const tempToken = jwt.sign(
+      {
+        _id: User._id,
+        email: User.email,
+      },
+      JWT_SECRET,
+      { expiresIn: "15min" }
+    );
+    await forgotPasswordOTPEmailTemplate(User.email, User.firstName, otp);
+    res.status(200).json({
+      message: "Otp has been send to you mail for resetting your password",
+      token: tempToken,
+    });
+  } catch (error) {
+    console.error("Error in forgot Password:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const userId = req.user._id;
+    const { otp, newPassword, confirmNewPassword } = req.body;
+    if (!otp || !newPassword || !confirmNewPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({ message: "Passwords must match" });
+    }
+    const User = await user
+      .findById(userId)
+      .select("+otp +otpExpiry +password");
+    if (!User) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (User.otp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+
+    if (User.otpExpiry < Date.now()) {
+      return res
+        .status(400)
+        .json({ message: "OTP expired. Please request a new one." });
+    }
+    User.password = newPassword;
+    User.otp = null;
+    User.otpExpiry = null;
+    await User.save();
+    res.status(200).json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("Error in reset Password:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+}
+
 module.exports = {
   registerUser,
   verifyEmail,
@@ -332,4 +425,7 @@ module.exports = {
   refreshAccessToken,
   login,
   loginOTP,
+  logout,
+  forgotPassword,
+  resetPassword,
 };
