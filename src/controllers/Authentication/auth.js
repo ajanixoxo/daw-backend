@@ -34,8 +34,12 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const existingUser = await user.findOne({ email });
     if (existingUser) {
-      res.status(400).json({
-        message: "user already exist",
+      if (existingUser.phone === phone) {
+        throw new AppError("Phone number already in use", 400);
+      }
+
+      return res.status(400).json({
+        message: "User already exists",
       });
     }
 
@@ -47,7 +51,7 @@ const registerUser = asyncHandler(async (req, res) => {
       lastName,
       email,
       password,
-      isVerified:false,
+      isVerified: false,
       phone,
       roles,
       otp,
@@ -78,17 +82,37 @@ const registerUser = asyncHandler(async (req, res) => {
   } catch (error) {
     console.error("Error in registering user:", error);
 
-    let errorMsg = error?.errors
-      ? Object.values(error.errors)
-          .map((err) => err.message)
-          .join(", ")
-      : error.message;
+    // let errorMsg = error?.errors
+    //   ? Object.values(error.errors)
+    //       .map((err) => err.message)
+    //       .join(", ")
+    //   : error.message;
 
+    // return res.status(400).json({
+    //   success: false,
+    //   status: "error",
+    //   message: errorMsg || "Error during register user",
+    // });
+    if (error.code === 11000) {
+    const field = Object.keys(error.keyPattern)[0];
     return res.status(400).json({
       success: false,
       status: "error",
-      message: errorMsg || "Error during register user",
+      message: `${field.charAt(0).toUpperCase() + field.slice(1)} already in use`,
     });
+  }
+
+  let errorMsg = error?.errors
+    ? Object.values(error.errors)
+        .map((err) => err.message)
+        .join(", ")
+    : error.message;
+
+  return res.status(400).json({
+    success: false,
+    status: "error",
+    message: errorMsg || "Error during register user",
+  });
   }
 });
 
@@ -107,7 +131,7 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
     if (User.isVerified) {
       return res.status(400).json({ message: "User already verified" });
     }
-    
+
     if (User.otp !== otp) {
       return next(new AppError("Invalid OTP", 400));
     }
@@ -150,7 +174,16 @@ const resendEmailVerificationOTP = asyncHandler(async (req, res) => {
     await User.save();
     await verificationEmailTemplate(email, User.firstName, otp);
 
-    res.status(200).json({ message: "OTP resent successfully" });
+    const { accessToken, refreshToken } = await User.generateToken();
+    User.refreshToken = refreshToken;
+    await User.save();
+
+    res.status(200).json({
+      message: "OTP resent successfully",
+      token: {
+        accessToken,
+      },
+    });
   } catch (error) {
     console.error("Error in resendLink:", error);
     throw new AppError("Internal server error", 500);
@@ -164,7 +197,9 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       return res.status(400).json({ message: "Refresh token required" });
     }
 
-    const existingUser = await user.findOne({ refreshToken });
+    const existingUser = await user
+      .findOne({ refreshToken })
+      .select("+refreshToken");
     if (!existingUser) {
       throw new AppError("Invalid refresh token", 401);
     }
@@ -174,7 +209,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
     if (!User) {
       return res.status(400).json({
-        message: "user already exist",
+        message: "user does not exist",
       });
     }
 
@@ -269,6 +304,7 @@ async function loginOTP(req, res) {
     }
 
     const { accessToken, refreshToken } = await User.generateToken();
+    User.refreshToken = refreshToken;
     User.otp = null;
     User.otpExpiry = null;
     await User.save();
