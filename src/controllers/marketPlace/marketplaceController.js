@@ -94,7 +94,30 @@ const getoRdersById = asyncHandler(async(req,res) => {
     }
 
     res.status(200).json({ success: true, order });
-})
+});
+
+const getAllProduct = asyncHandler(async(req,res) => {
+    try{
+      const products = await marketplaceService.getAllProduct();
+      if(!products){
+        return res.status(400).json({
+          message:"No products available"
+        })
+      }
+
+      return res.status(200).json({
+        message:"Fetched all the products",
+        products: products
+      });
+
+    }catch(error){
+      return res.status(500).json({
+        message:"Error during fetching the products",
+        error: error.message
+      })
+    }
+});
+
 module.exports = {
     createShop,
     getShops,
@@ -103,5 +126,6 @@ module.exports = {
     getProductsByShop,
     createOrder,
     getOrdersByBuyer,
-    getoRdersById
+    getoRdersById,
+    getAllProduct
 }
