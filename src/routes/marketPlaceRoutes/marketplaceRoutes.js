@@ -8,17 +8,17 @@ const marketplaceController = require('@controllers/marketPlace/marketplaceContr
 const router = express.Router();
 
 // Shops
-router.post("/create/shops", protect, restrictTo("admin", "seller"), marketplaceController.createShop);
+router.post("/create/shops", protect, restrictTo("buyer","admin", "seller"), marketplaceController.createShop);
 router.get("/get/shops", marketplaceController.getShops);
 router.get("/get/shops/:id", marketplaceController.getShopById);
 
 // Products
-router.post("/add/products", protect, restrictTo("admin", "seller"), marketplaceController.createProduct);
+router.post("/add/products", protect, restrictTo("admin","buyer", "seller"), marketplaceController.createProduct);
 router.get("/get/products/shop/:shop_id", marketplaceController.getProductsByShop);
-router.get('/get/all/products', marketplaceController.getAllProduct)
+router.get('/get/all/products', marketplaceController.getAllProduct);
 
 // Orders
-router.post("/place/orders", protect, restrictTo("member", "buyer"), marketplaceController.createOrder);
+router.post("/place/orders", protect, restrictTo("member","buyer", "buyer"), marketplaceController.createOrder);
 router.get("/get/orders", protect, restrictTo("member", "buyer"), marketplaceController.getOrdersByBuyer);
 router.get("/get/orders/:orderId", protect, restrictTo("member", "buyer"), marketplaceController.getoRdersById);
 
