@@ -19,7 +19,17 @@ const addToWishlist = asyncHandler(async (req, res) => {
 const removeFromWishlist = asyncHandler(async (req, res) => {
   const { product_id } = req.body;
   const user_id = req.user._id;
-  await marketplaceService.removeFromWishlist(user_id, product_id);
+  const deleted = await marketplaceService.removeFromWishlist(
+    user_id,
+    product_id
+  );
+
+  if (!deleted) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Wishlist item not found" });
+  }
+
   res.status(200).json({ success: true, message: "Removed" });
 });
 
