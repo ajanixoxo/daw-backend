@@ -18,7 +18,7 @@ router.post("/reviews", protect, controller.addReview);
 router.get("/reviews/:product_id", controller.getReviews);
 
 // cart 
-router.post("/cart", protect, controller.createCart);
+// router.post("/cart", protect, controller.createCart);
 router.post("/cart/item", protect, controller.addItemToCart);
 router.delete("/remove/cart/item", protect, controller.removeItemFromCart);
 router.get("/cart/:cart_id", protect, controller.getCartItems);

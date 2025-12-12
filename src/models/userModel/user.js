@@ -146,7 +146,7 @@ UserSchema.methods.generateToken = async function(){
         _id: this._id, 
         firstName: this.firstName, 
         email: this.email,
-        role: this.role, 
+        roles: this.roles, 
         status: this.status
         },
         jwtsecret,

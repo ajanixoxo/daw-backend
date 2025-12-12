@@ -20,6 +20,7 @@ const restrictTo = (...allowedRoles) => {
       : [req.user.role]; // backward compatibility
 
     const isAllowed = userRoles.some(role => allowedRoles.includes(role));
+    // console.log("User Roles:", userRoles, "Allowed Roles:", allowedRoles, "Is Allowed:", isAllowed);
 
     if (!isAllowed) {
       return res
