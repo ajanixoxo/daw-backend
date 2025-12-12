@@ -9,3 +9,7 @@ router.post('/verify-nin', protect, kycController.verifyNIN);
 
 module.exports = router;
 
+
+
+
+
