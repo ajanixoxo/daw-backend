@@ -8,7 +8,8 @@ const {
   loginOTP,
   logout,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  getUserProfile
 } = require('@controllers/Authentication/auth.js');
 const { protect } = require("@middlewares/authMiddleware.js");
 
@@ -31,5 +32,7 @@ router.post('/logout', protect, logout);
 router.post('/forgot/password', forgotPassword);
 
 router.post('/reset/password', protect, resetPassword);
+
+router.get('/profile', protect, getUserProfile);
 
 module.exports = router;
