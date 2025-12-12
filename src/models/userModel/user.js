@@ -128,6 +128,10 @@ const UserSchema = new mongoose.Schema({
     cart: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Cart'
+    },
+    shop:{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Shop'
     }
 
 },{ timestamps: true});
@@ -151,7 +155,8 @@ UserSchema.methods.generateToken = async function(){
         firstName: this.firstName, 
         email: this.email,
         roles: this.roles, 
-        status: this.status
+        status: this.status,
+        shop: this.shop
         },
         jwtsecret,
         {
