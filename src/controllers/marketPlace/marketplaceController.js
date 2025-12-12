@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 // import * as marketplaceService from "@services/marketplaceService.js";
 const marketplaceService = require("@services/marketPlace/marketPlaceServices.js")
+const AppError = require('@utils/Error/AppError.js');
 
 // Create a new shop
 const createShop = asyncHandler(async (req, res) => {
@@ -52,6 +53,25 @@ const createProduct = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, product });
 });
 
+const getProduct =  async(req, res) => {
+  try {
+    const { productId } = req.params;
+    const productView = await marketplaceService.getProductById(productId);
+    if(!productView){
+      return res.status(404).json({
+        message: 'product not found'
+      })
+    }
+
+    return res.status(200).json({
+      message:"Product fetched successfully",
+      product: productView
+    });
+
+  } catch (error) {
+    return next(new AppError('Error while fetching product', 404));
+  }
+}
 // Get products by shop
 const getProductsByShop = asyncHandler(async (req, res) => {
   const { shop_id } = req.params;
@@ -127,5 +147,6 @@ module.exports = {
     createOrder,
     getOrdersByBuyer,
     getoRdersById,
-    getAllProduct
+    getAllProduct,
+    getProduct
 }
