@@ -16,8 +16,13 @@ const updateStock = async (product_id, quantity) => {
 };
 
 // WISHLIST
-const addToWishlist = async (user_id, product_id) =>
-  await Wishlist.create({ user_id, product_id });
+const addToWishlist = async (user_id, product_id) =>{
+  const additemtowishlist = await Wishlist.findById({ user_id, product_id });
+  if(additemtowishlist){
+    res.status(400).json({ success: false, message: "Item already in wishlist" });
+  }
+  return await Wishlist.create({ user_id, product_id });
+}
 const removeFromWishlist = async (user_id, product_id) =>
   await Wishlist.findOneAndDelete({ user_id, product_id });
 const getWishlist = async (user_id) =>

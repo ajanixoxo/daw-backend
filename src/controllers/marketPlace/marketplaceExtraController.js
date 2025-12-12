@@ -13,6 +13,11 @@ const addToWishlist = asyncHandler(async (req, res) => {
   const { product_id } = req.body;
   const user_id = req.user._id;
   const item = await marketplaceService.addToWishlist(user_id, product_id);
+  if (!item) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Item can't be added in wishlist" });
+  }
   res.status(201).json({ success: true, item });
 });
 
