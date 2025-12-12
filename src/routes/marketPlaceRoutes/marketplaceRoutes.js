@@ -16,6 +16,7 @@ router.get("/get/shops/:id", marketplaceController.getShopById);
 router.post("/add/products", protect, restrictTo("admin", "seller","buyer"), marketplaceController.createProduct);
 router.get("/get/products/shop/:shop_id", marketplaceController.getProductsByShop);
 router.get('/get/all/products', marketplaceController.getAllProduct);
+router.get('/get/products/:productId', marketplaceController.getProduct);
 
 // Orders
 router.post("/place/orders", protect, restrictTo("member","buyer"), marketplaceController.createOrder);

@@ -124,6 +124,10 @@ const UserSchema = new mongoose.Schema({
     updatedAt: {
         type: Date,
         default: Date.now
+    },
+    cart: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Cart'
     }
 
 },{ timestamps: true});

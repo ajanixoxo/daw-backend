@@ -2,6 +2,7 @@ const Shop = require("@models/marketPlace/shopModel.js");
 const Product = require("@models/marketPlace/productModel.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const OrderItem = require("@models/marketPlace/orderItemModel.js");
+const AppError = require('@utils/Error/AppError.js');
 
 // SHOP
 const createShop = async (data) => await Shop.create(data);
@@ -42,6 +43,14 @@ async function getAllProduct() {
   }
 }
 
+const getProductById = async(productId) => {
+  try {
+    return await Product.findById(productId);
+  } catch (error) {
+    return next(new AppError('Error while fetching product', 404));
+  }
+}
+
 module.exports = {
   createShop,
   getShops,
@@ -52,4 +61,5 @@ module.exports = {
   getOrdersByBuyer,
   getOrdersById,
   getAllProduct,
+  getProductById
 };
