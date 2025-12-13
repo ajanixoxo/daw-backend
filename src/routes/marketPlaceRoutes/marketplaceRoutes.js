@@ -8,7 +8,7 @@ const marketplaceController = require('@controllers/marketPlace/marketplaceContr
 const router = express.Router();
 
 // Shops
-router.post("/create/shops", protect, restrictTo("admin", "seller"), marketplaceController.createShop);
+router.post("/create/shops", protect, restrictTo("admin", "seller", "buyer"), marketplaceController.createShop);
 router.get("/get/shops", marketplaceController.getShops);
 router.get("/get/shops/:id", marketplaceController.getShopById);
 

@@ -2,12 +2,29 @@ const asyncHandler = require('express-async-handler');
 // import * as marketplaceService from "@services/marketplaceService.js";
 const marketplaceService = require("@services/marketPlace/marketPlaceServices.js")
 const AppError = require('@utils/Error/AppError.js');
+const user = require('@models/userModel/user.js');
 
 // Create a new shop
 const createShop = asyncHandler(async (req, res) => {
   const { name, description, category, logo_url, banner_url, is_member_shop, cooperative_id } = req.body;
 
   const owner_id = req.user._id;
+
+  // Get user to check roles and upgrade if needed
+  const User = await user.findById(owner_id);
+  if (!User) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Get current roles array
+  const currentRoles = Array.isArray(User.roles) ? User.roles : [];
+
+  // If user has "buyer" role, automatically upgrade to "seller"
+  if (currentRoles.includes('buyer') && !currentRoles.includes('seller')) {
+    currentRoles.push('seller');
+    User.roles = currentRoles;
+    await User.save();
+  }
 
   const shopData = {
     owner_id,
