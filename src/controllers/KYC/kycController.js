@@ -17,11 +17,10 @@ const verifyNIN = asyncHandler(async (req, res) => {
       throw new AppError('nin is required', 400);
     }
 
-    // Use userId from body if provided, otherwise use authenticated user's ID
-    const targetUserId = userId || req.user._id;
+    // userId is required in the request body
+    const targetUserId = userId;
     
     console.log('KYC Verification - userId from body:', userId);
-    console.log('KYC Verification - req.user._id:', req.user._id);
     console.log('KYC Verification - targetUserId:', targetUserId);
     
     if (!targetUserId) {
