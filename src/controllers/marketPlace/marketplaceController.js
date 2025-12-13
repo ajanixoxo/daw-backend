@@ -39,11 +39,6 @@ const createShop = asyncHandler(async (req, res) => {
   };
 
   const shop = await marketplaceService.createShop(shopData);
-  
-  // Update user's shop field with the created shop ID
-  User.shop = shop._id;
-  await User.save();
-
   res.status(201).json({ success: true, shop });
 });
 

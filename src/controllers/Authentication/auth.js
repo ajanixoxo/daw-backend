@@ -271,9 +271,6 @@ async function login(req, res) {
     User.otp = undefined;
     User.otpExpiry = undefined;
 
-    // Populate shop before sending user data
-    await User.populate('shop');
-
     res.status(200).json({
       message: "OTP sent to email. Please verify OTP to complete login.",
       user: User,
@@ -316,9 +313,6 @@ async function loginOTP(req, res) {
     await User.save();
 
     User.password = undefined;
-
-    // Populate shop before sending user data
-    await User.populate('shop');
 
     res.json({
       message: "Login successful",
@@ -427,31 +421,11 @@ async function resetPassword(req, res) {
 const getUserProfile = asyncHandler(async (req, res) => {
   try {
     const userId = req.user._id;
-    
-    // Get user with populated shop
-    const User = await user.findById(userId)
-      .select("-password -refreshToken")
-      .populate('shop');
-    
+    const User = await user.findById(userId).select("-password -refreshToken");
     if (!User) {
       return res.status(404).json({ message: "User not found" });
     }
-
-    // Check if user has a shop
-    const hasShop = !!User.shop;
-    const shopId = User.shop ? User.shop._id : null;
-    const shopName = User.shop ? User.shop.name : null;
-
-    res.status(200).json({ 
-      success: true, 
-      user: User,
-      shop: {
-        hasShop: hasShop,
-        shopId: shopId,
-        shopName: shopName,
-        shopDetails: User.shop || null
-      }
-    });
+    res.status(200).json({ success: true, user: User });
   } catch (error) {
     console.error("Error in getUserProfile:", error);
     res.status(500).json({ message: "Internal server error" });

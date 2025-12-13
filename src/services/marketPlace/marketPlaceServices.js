@@ -8,7 +8,6 @@ const AppError = require('@utils/Error/AppError.js');
 const createShop = async (data) => await Shop.create(data);
 const getShops = async () => await Shop.find();
 const getShopById = async (id) => await Shop.findById(id);
-const getShopByOwnerId = async (owner_id) => await Shop.findOne({ owner_id });
 
 // PRODUCT
 const createProduct = async (data) => await Product.create(data);
@@ -56,7 +55,6 @@ module.exports = {
   createShop,
   getShops,
   getShopById,
-  getShopByOwnerId,
   createProduct,
   getProductsByShop,
   createOrder,
