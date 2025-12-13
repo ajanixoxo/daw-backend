@@ -421,11 +421,31 @@ async function resetPassword(req, res) {
 const getUserProfile = asyncHandler(async (req, res) => {
   try {
     const userId = req.user._id;
-    const User = await user.findById(userId).select("-password -refreshToken");
+    
+    // Get user with populated shop
+    const User = await user.findById(userId)
+      .select("-password -refreshToken")
+      .populate('shop');
+    
     if (!User) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.status(200).json({ success: true, user: User });
+
+    // Check if user has a shop
+    const hasShop = !!User.shop;
+    const shopId = User.shop ? User.shop._id : null;
+    const shopName = User.shop ? User.shop.name : null;
+
+    res.status(200).json({ 
+      success: true, 
+      user: User,
+      shop: {
+        hasShop: hasShop,
+        shopId: shopId,
+        shopName: shopName,
+        shopDetails: User.shop || null
+      }
+    });
   } catch (error) {
     console.error("Error in getUserProfile:", error);
     res.status(500).json({ message: "Internal server error" });
