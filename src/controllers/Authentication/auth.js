@@ -271,6 +271,9 @@ async function login(req, res) {
     User.otp = undefined;
     User.otpExpiry = undefined;
 
+    // Populate shop before sending user data
+    await User.populate('shop');
+
     res.status(200).json({
       message: "OTP sent to email. Please verify OTP to complete login.",
       user: User,
@@ -313,6 +316,9 @@ async function loginOTP(req, res) {
     await User.save();
 
     User.password = undefined;
+
+    // Populate shop before sending user data
+    await User.populate('shop');
 
     res.json({
       message: "Login successful",
