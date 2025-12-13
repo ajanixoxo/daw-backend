@@ -1,35 +1,26 @@
-const express = require('express');
+const express = require("express");
+const { protect, restrictTo } = require("@middlewares/authMiddleware.js");
+const controller = require("@controllers/marketPlace/marketplaceExtraController.js");
+
 const router = express.Router();
-const controller = require('@controllers/marketPlace/marketplaceExtraController.js');
-const { protect, restrictTo } = require("@middlewares/authMiddleware.js"); 
 
-router.get('/stock/:product_id', controller.getStock);
-router.put('/stock', protect, restrictTo("admin", "seller"), controller.updateStock);
+// stock
+router.get("/stock/:product_id", controller.getStock);
+router.put("/stock", protect, restrictTo("admin"), controller.updateStock); // for admin only
 
-router.route('/wishlist')
-  .get(protect, controller.getWishlist)
-  .post(protect, controller.addToWishlist)
-  .delete(protect, controller.clearWishlist);
+// wishlist 
+router.post("/wishlist", protect, controller.addToWishlist);
+router.delete("/remove/wishlist", protect, controller.removeFromWishlist);
+router.get("/wishlist", protect, controller.getWishlist);
 
-router.delete('/wishlist/:product_id', protect, controller.removeFromWishlist);
+// review or we can say feedback
+router.post("/reviews", protect, controller.addReview);
+router.get("/reviews/:product_id", controller.getReviews);
 
-router.route('/reviews')
-  .post(protect, controller.addReview);
-
-router.route('/reviews/:product_id')
-  .get(controller.getReviews); 
-
-router.delete('/reviews/:review_id', protect, controller.deleteReview);
-
-router.route('/cart')
-  .get(protect, controller.getCartItems)
-  .post(protect, controller.addItemToCart)
-  .delete(protect, controller.clearCart);
-
-router.post('/cart/validate', protect, controller.validateCart);
-
-router.route('/cart/:cart_item_id')
-  .put(protect, controller.updateCartItem)
-  .delete(protect, controller.removeItemFromCart);
+// cart 
+// router.post("/cart", protect, controller.createCart);
+router.post("/cart/item", protect, controller.addItemToCart);
+router.delete("/remove/cart/item", protect, controller.removeItemFromCart);
+router.get("/cart/:cart_id", protect, controller.getCartItems);
 
 module.exports = router;
