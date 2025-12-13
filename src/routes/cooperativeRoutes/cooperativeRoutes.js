@@ -9,10 +9,10 @@ const { protect, restrictTo } = require("@middlewares/authMiddleware.js");
 
 const router = express.Router();
 
-router.post("/", protect, restrictTo("seller","buyer"), createCooperative);
-router.put("/", protect, restrictTo("seller","buyer"), updateCooperative); 
-router.get("/", protect, restrictTo("seller","buyer","cooperative"), listCooperatives);
-router.get("/:id", protect, getCooperative);
+router.post("/", protect, restrictTo("admin", "cooperative"), createCooperative);
+router.put("/", protect, restrictTo("admin", "cooperative"), updateCooperative); 
+router.get("/", protect, restrictTo("admin", "seller","buyer","cooperative"), listCooperatives);
+router.get("/:id", protect, restrictTo("admin", "seller","buyer","cooperative"), getCooperative);
 
 
 module.exports = router;
