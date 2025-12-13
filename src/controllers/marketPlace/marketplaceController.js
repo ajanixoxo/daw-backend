@@ -13,6 +13,22 @@ const createShop = asyncHandler(async (req, res) => {
 
   const owner_id = req.user._id;
 
+  // Get user to check roles and upgrade if needed
+  const User = await user.findById(owner_id);
+  if (!User) {
+    throw new AppError('User not found', 404);
+  }
+
+  // Get current roles array
+  const currentRoles = Array.isArray(User.roles) ? User.roles : [];
+
+  // If user has "buyer" role, automatically upgrade to "seller"
+  if (currentRoles.includes('buyer') && !currentRoles.includes('seller')) {
+    currentRoles.push('seller');
+    User.roles = currentRoles;
+    await User.save();
+  }
+
   const shopData = {
     owner_id,
     cooperative_id: cooperative_id || null,
