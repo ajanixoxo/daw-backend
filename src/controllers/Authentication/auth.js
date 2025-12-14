@@ -1,4 +1,5 @@
 const user = require("@models/userModel/user.js");
+const Member = require("@models/memberModel/member.model.js");
 const asyncHandler = require("express-async-handler");
 const AppError = require("@utils/Error/AppError.js");
 const {
@@ -425,7 +426,28 @@ const getUserProfile = asyncHandler(async (req, res) => {
     if (!User) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.status(200).json({ success: true, user: User });
+
+    // Find all memberships for this user
+    const memberships = await Member.find({ userId }).select("_id cooperativeId status joinDate monthlyContribution subscriptionTierId");
+
+    // Convert user to object and add member information
+    const userObject = User.toObject();
+    
+    // Add member information if user has joined any cooperative
+    if (memberships && memberships.length > 0) {
+      userObject.member = memberships.map(membership => ({
+        memberId: membership._id,
+        cooperativeId: membership.cooperativeId,
+        status: membership.status,
+        joinDate: membership.joinDate,
+        monthlyContribution: membership.monthlyContribution,
+        subscriptionTierId: membership.subscriptionTierId
+      }));
+    } else {
+      userObject.member = [];
+    }
+
+    res.status(200).json({ success: true, user: userObject });
   } catch (error) {
     console.error("Error in getUserProfile:", error);
     res.status(500).json({ message: "Internal server error" });
