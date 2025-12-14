@@ -1,5 +1,6 @@
 const user = require("@models/userModel/user.js");
 const Member = require("@models/memberModel/member.model.js");
+const Shop = require("@models/marketPlace/shopModel.js");
 const asyncHandler = require("express-async-handler");
 const AppError = require("@utils/Error/AppError.js");
 const {
@@ -430,6 +431,9 @@ const getUserProfile = asyncHandler(async (req, res) => {
     // Find all memberships for this user
     const memberships = await Member.find({ userId }).select("_id cooperativeId status joinDate monthlyContribution subscriptionTierId");
 
+    // Find all shops owned by this user
+    const shops = await Shop.find({ owner_id: userId }).select("_id name description category logo_url banner_url is_member_shop status cooperative_id");
+
     // Convert user to object and add member information
     const userObject = User.toObject();
     
@@ -445,6 +449,23 @@ const getUserProfile = asyncHandler(async (req, res) => {
       }));
     } else {
       userObject.member = [];
+    }
+
+    // Add shop information if user owns any shops
+    if (shops && shops.length > 0) {
+      userObject.shop = shops.map(shop => ({
+        shopId: shop._id,
+        name: shop.name,
+        description: shop.description,
+        category: shop.category,
+        logo_url: shop.logo_url,
+        banner_url: shop.banner_url,
+        is_member_shop: shop.is_member_shop,
+        status: shop.status,
+        cooperative_id: shop.cooperative_id
+      }));
+    } else {
+      userObject.shop = [];
     }
 
     res.status(200).json({ success: true, user: userObject });
