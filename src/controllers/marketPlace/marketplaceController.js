@@ -9,24 +9,29 @@ const Shop = require("@models/marketPlace/shopModel.js");
 const createShop = asyncHandler(async (req, res) => {
   console.log("🔥 createShop controller HIT");
 
+  // Ensure user is authenticated
+  if (!req.user || !req.user._id) {
+    throw new AppError('User not authenticated', 401);
+  }
+
   const { name, description, category, logo_url, banner_url, is_member_shop, cooperative_id } = req.body;
 
   const owner_id = req.user._id;
 
   // Get user to check roles and upgrade if needed
-  const User = await user.findById(owner_id);
-  if (!User) {
+  const foundUser = await User.findById(owner_id);
+  if (!foundUser) {
     throw new AppError('User not found', 404);
   }
 
   // Get current roles array
-  const currentRoles = Array.isArray(User.roles) ? User.roles : [];
+  const currentRoles = Array.isArray(foundUser.roles) ? foundUser.roles : [];
 
   // If user has "buyer" role, automatically upgrade to "seller"
   if (currentRoles.includes('buyer') && !currentRoles.includes('seller')) {
     currentRoles.push('seller');
-    User.roles = currentRoles;
-    await User.save();
+    foundUser.roles = currentRoles;
+    await foundUser.save();
   }
 
   const shopData = {
