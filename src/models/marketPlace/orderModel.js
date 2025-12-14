@@ -15,7 +15,7 @@ const orderSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "LogisticsProvider",
   },
-  total_amount: { type: Number, required: true , min: [0.01, 'Total amount must be greater than 0']},
+  total_amount: { type: Number, required: true, min: [0.01, 'Total amount must be greater than 0'] },
   discount: { type: Number, default: 0 },
   escrow_status: {
     type: String,

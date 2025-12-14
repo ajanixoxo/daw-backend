@@ -2,11 +2,12 @@ const asyncHandler = require('express-async-handler');
 // import * as marketplaceService from "@services/marketplaceService.js";
 const marketplaceService = require("@services/marketPlace/marketPlaceServices.js")
 const AppError = require('@utils/Error/AppError.js');
-const user = require("@models/userModel/user.js");
+const User = require("@models/userModel/user.js");
 const Shop = require("@models/marketPlace/shopModel.js");
 
 // Create a new shop
 const createShop = asyncHandler(async (req, res) => {
+  console.log("🔥 createShop controller HIT");
 
   const { name, description, category, logo_url, banner_url, is_member_shop, cooperative_id } = req.body;
 
@@ -70,6 +71,11 @@ const createProduct = asyncHandler(async (req, res) => {
   if (!shop_id) {
     throw new AppError("Shop ID is required", 400);
   }
+
+  if (!req.user.shop) {
+    throw new AppError("Seller does not have a shop", 400);
+  }
+
   const product = await marketplaceService.createProduct({
     sellerId: req.user._id,
     shopId: shop_id,
