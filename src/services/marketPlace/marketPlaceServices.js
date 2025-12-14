@@ -2,7 +2,8 @@ const Shop = require("@models/marketPlace/shopModel.js");
 const Product = require("@models/marketPlace/productModel.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const OrderItem = require("@models/marketPlace/orderItemModel.js");
-const AppError = require('@utils/Error/AppError.js');
+const AppError = require("@utils/Error/AppError.js");
+const mongoose = require("mongoose");
 
 // SHOP
 const createShop = async (data) => await Shop.create(data);
@@ -10,21 +11,128 @@ const getShops = async () => await Shop.find();
 const getShopById = async (id) => await Shop.findById(id);
 
 // PRODUCT
-const createProduct = async (data) => await Product.create(data);
+const createProduct = async ({ sellerId, shopId, name, quantity, price }) => {
+  const shop = await Shop.findOne({
+    _id: shopId,
+    owner_id: sellerId,
+    status: "active",
+  });
+
+  if (!shop) {
+    throw new AppError("Invalid or inactive shop", 403);
+  }
+
+  if (price <= 0) {
+    throw new AppError("Price must be greater than zero", 400);
+  }
+
+  if (quantity < 0) {
+    throw new AppError("Quantity cannot be negative", 400);
+  }
+
+  const existingProduct = await Product.findOne({
+    shop_id: shopId,
+    name: { $regex: `^${name}$`, $options: "i" },
+  });
+
+  if (existingProduct) {
+    throw new AppError("Product already exists in this shop", 409);
+  }
+
+  return await Product.create({
+    shop_id: shopId,
+    name,
+    quantity,
+    price,
+  });
+};
+
 const getProductsByShop = async (shop_id) => await Product.find({ shop_id });
 
 // ORDER
-const createOrder = async (orderData, items) => {
-  const order = await Order.create(orderData);
+const createOrder = async (buyer_id, shop_id, items) => {
+  try {
+    let total_amount = 0;
+    const orderItems = [];
+    const updatedProducts = []; 
+    console.log(" Starting order creation...");
 
-  const orderItems = items.map((i) => ({
-    ...i,
-    order_id: order._id,
-  }));
+    for (const item of items) {
+      if (!item.product_id || !item.quantity || item.quantity <= 0) {
+        throw new AppError("Invalid item data", 400);
+      }
 
-  const createdItems = await OrderItem.insertMany(orderItems);
+      const product = await Product.findById(item.product_id);
 
-  return { order, orderItems: createdItems };
+      if (!product) throw new AppError("Product not found", 404);
+      if (product.shop_id.toString() !== shop_id.toString())
+        throw new AppError("Product does not belong to this shop", 400);
+      if (product.quantity < item.quantity)
+        throw new AppError(`Insufficient stock for ${product.name}`, 400);
+
+      if (!product.price || product.price <= 0) {
+        throw new AppError(`Invalid price for product ${product.name}`, 400);
+      }
+
+      const subtotal = product.price * item.quantity;
+      total_amount += subtotal;
+
+      console.log(`Processing: ${product.name}, Price: ${product.price}, Qty: ${item.quantity}, Subtotal: ${subtotal}`);
+
+      orderItems.push({
+        product_id: product._id,
+        price: product.price,
+        quantity: item.quantity,
+      });
+
+      const originalQuantity = product.quantity;
+      product.quantity -= item.quantity;
+      await product.save();
+      
+      updatedProducts.push({
+        product,
+        originalQuantity,
+        quantityReduced: item.quantity
+      });
+    }
+
+    console.log(` Total amount calculated: ${total_amount}`);
+
+    if (!total_amount || total_amount <= 0 || isNaN(total_amount)) {
+      
+      for (const { product, originalQuantity } of updatedProducts) {
+        product.quantity = originalQuantity;
+        await product.save();
+      }
+      throw new AppError("Invalid total amount calculated", 400);
+    }
+
+    const order = await Order.create({
+      buyer_id,
+      shop_id,
+      total_amount,
+      status: "pending",
+      payment_status: "unpaid",
+      escrow_status: "pending",
+    });
+
+    console.log(" Order created:", order._id);
+
+    const finalItems = orderItems.map(i => ({
+      ...i,
+      order_id: order._id,
+    }));
+
+    const createdItems = await OrderItem.insertMany(finalItems);
+
+    console.log(" Order items created");
+
+    return { order, orderItems: createdItems };
+
+  } catch (error) {
+    console.error(" Error in createOrder:", error.message);
+    throw error;
+  }
 };
 
 const getOrdersByBuyer = async (buyer_id) =>
@@ -43,13 +151,48 @@ async function getAllProduct() {
   }
 }
 
-const getProductById = async(productId) => {
+const getProductById = async (productId) => {
   try {
     return await Product.findById(productId);
   } catch (error) {
-    return next(new AppError('Error while fetching product', 404));
+    return res.status(500).json({
+      message: "Error while fetching product",
+      error: error.message,
+    });
   }
-}
+};
+
+const getOrdersByShopId = async (shop_id) => {
+ const orders = await Order.find({ shop_id })
+    .populate("buyer_id", "firstName lastName email phone")
+    .populate("shop_id")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  for (let order of orders) {
+    const items = await OrderItem.find({ order_id: order._id })
+      .populate({
+        path: "product_id",
+        select: "name description price image_url category"
+      })
+      .lean();
+
+    order.items = items.map(item => ({
+      _id: item._id,
+      product_id: item.product_id._id,
+      product_name: item.product_id.name,
+      product_description: item.product_id.description,
+      product_image: item.product_id.image_url,
+      product_category: item.product_id.category,
+      price_at_purchase: item.price, 
+      current_price: item.product_id.price, 
+      quantity: item.quantity,
+      subtotal: item.price * item.quantity
+    }));
+  }
+
+  return orders;
+};
 
 module.exports = {
   createShop,
@@ -61,5 +204,6 @@ module.exports = {
   getOrdersByBuyer,
   getOrdersById,
   getAllProduct,
-  getProductById
+  getProductById,
+  getOrdersByShopId,
 };
