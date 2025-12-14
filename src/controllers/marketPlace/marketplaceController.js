@@ -71,27 +71,42 @@ const getShopById = asyncHandler(async (req, res) => {
 
 // Create a product (seller/admin)
 const createProduct = asyncHandler(async (req, res) => {
-  const { shop_id } = req.body;
+  const { shop_id, name, quantity, price } = req.body;
 
   if (!shop_id) {
     throw new AppError("Shop ID is required", 400);
   }
 
-  if (!req.user.shop) {
-    throw new AppError("Seller does not have a shop", 400);
+  if (!name) {
+    throw new AppError("Product name is required", 400);
+  }
+
+  if (quantity === undefined || quantity === null) {
+    throw new AppError("Quantity is required", 400);
+  }
+
+  if (price === undefined || price === null) {
+    throw new AppError("Price is required", 400);
+  }
+
+  // Verify the shop exists and belongs to the user
+  const shop = await Shop.findOne({
+    _id: shop_id,
+    owner_id: req.user._id,
+    status: "active"
+  });
+
+  if (!shop) {
+    throw new AppError("Shop not found or you don't have permission to add products to this shop", 403);
   }
 
   const product = await marketplaceService.createProduct({
     sellerId: req.user._id,
     shopId: shop_id,
-    ...req.body
+    name,
+    quantity,
+    price
   });
-
-  if (!product) {
-    return res.status(400).json({
-      message: "Product not created"
-    })
-  }
 
   res.status(201).json({ success: true, product });
 });
