@@ -25,7 +25,7 @@ router.get("/get/orders/:orderId", protect, restrictTo("member", "buyer"), marke
 router.get(
     "/get/orders/shop/:shop_id",
     protect,
-    restrictTo("admin", "seller"),
+
     marketplaceController.getOrdersByShop
 );
 

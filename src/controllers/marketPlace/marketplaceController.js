@@ -9,24 +9,29 @@ const Shop = require("@models/marketPlace/shopModel.js");
 const createShop = asyncHandler(async (req, res) => {
   console.log("🔥 createShop controller HIT");
 
+  // Ensure user is authenticated
+  if (!req.user || !req.user._id) {
+    throw new AppError('User not authenticated', 401);
+  }
+
   const { name, description, category, logo_url, banner_url, is_member_shop, cooperative_id } = req.body;
 
   const owner_id = req.user._id;
 
   // Get user to check roles and upgrade if needed
-  const User = await user.findById(owner_id);
-  if (!User) {
+  const foundUser = await User.findById(owner_id);
+  if (!foundUser) {
     throw new AppError('User not found', 404);
   }
 
   // Get current roles array
-  const currentRoles = Array.isArray(User.roles) ? User.roles : [];
+  const currentRoles = Array.isArray(foundUser.roles) ? foundUser.roles : [];
 
   // If user has "buyer" role, automatically upgrade to "seller"
   if (currentRoles.includes('buyer') && !currentRoles.includes('seller')) {
     currentRoles.push('seller');
-    User.roles = currentRoles;
-    await User.save();
+    foundUser.roles = currentRoles;
+    await foundUser.save();
   }
 
   const shopData = {
@@ -66,27 +71,42 @@ const getShopById = asyncHandler(async (req, res) => {
 
 // Create a product (seller/admin)
 const createProduct = asyncHandler(async (req, res) => {
-  const { shop_id } = req.body;
+  const { shop_id, name, quantity, price } = req.body;
 
   if (!shop_id) {
     throw new AppError("Shop ID is required", 400);
   }
 
-  if (!req.user.shop) {
-    throw new AppError("Seller does not have a shop", 400);
+  if (!name) {
+    throw new AppError("Product name is required", 400);
+  }
+
+  if (quantity === undefined || quantity === null) {
+    throw new AppError("Quantity is required", 400);
+  }
+
+  if (price === undefined || price === null) {
+    throw new AppError("Price is required", 400);
+  }
+
+  // Verify the shop exists and belongs to the user
+  const shop = await Shop.findOne({
+    _id: shop_id,
+    owner_id: req.user._id,
+    status: "active"
+  });
+
+  if (!shop) {
+    throw new AppError("Shop not found or you don't have permission to add products to this shop", 403);
   }
 
   const product = await marketplaceService.createProduct({
     sellerId: req.user._id,
     shopId: shop_id,
-    ...req.body
+    name,
+    quantity,
+    price
   });
-
-  if (!product) {
-    return res.status(400).json({
-      message: "Product not created"
-    })
-  }
 
   res.status(201).json({ success: true, product });
 });

@@ -13,18 +13,18 @@ const jwtsecret = process.env.JWT_SECRET;
 const saltRounds = 10;
 
 const UserSchema = new mongoose.Schema({
-    firstName: {
+    firstName:{
         type: String,
         required: [true, 'First name is required'],
         trim: true
     },
 
-    lastName: {
+    lastName:{
         type: String,
         trim: true
     },
 
-    email: {
+    email:{
         type: String,
         required: [true, 'Email is required'],
         unique: true,
@@ -33,27 +33,27 @@ const UserSchema = new mongoose.Schema({
         match: [/.+\@.+\..+/, 'Please fill a valid email address']
     },
 
-    phone: {
+    phone:{
         type: String,
         required: [true, 'phone number is required'],
         unique: true,
         trim: true
     },
 
-    password: {
+    password:{
         type: String,
         required: true,
         minlength: 6,
         select: false
     },
 
-    otp: {
+    otp: { 
         type: String,
-        select: false
+        select: false 
     },
 
-    otpExpires: {
-        type: Date
+    otpExpires: { 
+        type: Date 
     },
 
     isVerified: {
@@ -68,16 +68,16 @@ const UserSchema = new mongoose.Schema({
     },
 
     kycVerified: {
-        type: Boolean,
-        default: false,
+      type: Boolean,
+      default: false,
     },
 
     kycVerifiedAt: {
-        type: Date,
+      type: Date,
     },
 
     kycData: {
-        type: mongoose.Schema.Types.Mixed,
+      type: mongoose.Schema.Types.Mixed,
     },
 
     // role: {
@@ -89,16 +89,16 @@ const UserSchema = new mongoose.Schema({
     // },
 
     roles: {
-        type: [String],
-        enum: [
-            "buyer",
-            "seller",
-            "admin",
-            "cooperative",
-            "member",
-            "logistics_provider",
-        ],
-        required: true,
+      type: [String],
+      enum: [
+        "buyer",
+        "seller",
+        "admin",
+        "cooperative",
+        "member",
+        "logistics_provider",
+      ],
+      required: true,
     },
 
     status: {
@@ -112,7 +112,7 @@ const UserSchema = new mongoose.Schema({
         select: false
     },
 
-    verificationToken: {
+    verificationToken :{
         type: String
     },
 
@@ -129,55 +129,58 @@ const UserSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Cart'
     },
+    shop:{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Shop'
+    }
 
-}, { timestamps: true });
+},{ timestamps: true});
 
 
-UserSchema.pre('save', async function (next) {
+UserSchema.pre('save', async function(next){
     if (!this.isModified('password')) return next();
     const salt = await bcrypt.genSalt(saltRounds);
     this.password = await bcrypt.hash(this.password, salt);
     next();
 });
 
-UserSchema.methods.comparePassword = async function (Enteredpassword) {
+UserSchema.methods.comparePassword = async function(Enteredpassword){
     return await bcrypt.compare(Enteredpassword, this.password);
 };
 
-UserSchema.methods.generateToken = async function () {
-    console.log("Shop in user doc:", this.shop);
-
-    const accessToken = jwt.sign(
+UserSchema.methods.generateToken = async function(){
+    const accessToken =  jwt.sign(
         {
-            _id: this._id,
-            firstName: this.firstName,
-            email: this.email,
-            roles: this.roles,
-            status: this.status,
+        _id: this._id, 
+        firstName: this.firstName, 
+        email: this.email,
+        roles: this.roles, 
+        status: this.status,
+        shop: this.shop
         },
         jwtsecret,
         {
-            expiresIn: "1d"
+            expiresIn : "1d"
         }
     )
 
-    const refreshToken = jwt.sign({ _id: this._id }, jwtsecret, {
-        expiresIn: "15d",
-    });
+  const refreshToken = jwt.sign({ _id: this._id }, jwtsecret, {
+    expiresIn: "15d",
+  });
 
     return { accessToken, refreshToken };
 }
 
 // UserSchema.methods.generateRefreshToken = async function(){
-// return jwt.sign(
-//     {_id: this._id},
-//     jwtsecret,
-//     {
-//         expiresIn : "15d"
-//     }
-// )
+    // return jwt.sign(
+    //     {_id: this._id},
+    //     jwtsecret,
+    //     {
+    //         expiresIn : "15d"
+    //     }
+    // )
 // }
 
 
 const user = mongoose.model("User", UserSchema);
-module.exports = user;
+module.exports =  user;
