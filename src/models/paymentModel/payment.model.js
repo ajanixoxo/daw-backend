@@ -22,6 +22,16 @@ const PaymentSchema = new mongoose.Schema(
     charge: Number,
 
     rawResponse: Object,
+    name: String,
+    email: String,
+    phone: String,
+    country: String,
+    state: String,
+    city: String,
+    address: [String],
+    zipCode: String,
+    logisticsInfo: String,
+    DeliveryAddress: String,
   },
   { timestamps: true }
 );
