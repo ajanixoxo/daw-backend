@@ -50,34 +50,45 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price }) => {
 const getProductsByShop = async (shop_id) => await Product.find({ shop_id });
 
 // ORDER
-const createOrder = async (buyer_id, shop_id, items) => {
+const createOrder = async (buyer_id, items) => {
   try {
     let total_amount = 0;
     const orderItems = [];
-    const updatedProducts = []; 
-    console.log(" Starting order creation...");
+    const updatedProducts = [];
+    let derivedShopId = null;
 
-    for (const item of items) {
+    console.log("Starting order creation...");
+
+    for (let index = 0; index < items.length; index++) {
+      const item = items[index];
+
       if (!item.product_id || !item.quantity || item.quantity <= 0) {
         throw new AppError("Invalid item data", 400);
       }
 
       const product = await Product.findById(item.product_id);
-
       if (!product) throw new AppError("Product not found", 404);
-      if (product.shop_id.toString() !== shop_id.toString())
-        throw new AppError("Product does not belong to this shop", 400);
-      if (product.quantity < item.quantity)
+
+      // 🔹 Derive shop_id from first product
+      if (index === 0) {
+        derivedShopId = product.shop_id;
+      }
+
+      // 🔹 Ensure all products belong to same shop
+      if (product.shop_id.toString() !== derivedShopId.toString()) {
+        throw new AppError("All products must belong to the same shop", 400);
+      }
+
+      if (product.quantity < item.quantity) {
         throw new AppError(`Insufficient stock for ${product.name}`, 400);
+      }
 
       if (!product.price || product.price <= 0) {
-        throw new AppError(`Invalid price for product ${product.name}`, 400);
+        throw new AppError(`Invalid price for ${product.name}`, 400);
       }
 
       const subtotal = product.price * item.quantity;
       total_amount += subtotal;
-
-      console.log(`Processing: ${product.name}, Price: ${product.price}, Qty: ${item.quantity}, Subtotal: ${subtotal}`);
 
       orderItems.push({
         product_id: product._id,
@@ -88,35 +99,26 @@ const createOrder = async (buyer_id, shop_id, items) => {
       const originalQuantity = product.quantity;
       product.quantity -= item.quantity;
       await product.save();
-      
-      updatedProducts.push({
-        product,
-        originalQuantity,
-        quantityReduced: item.quantity
-      });
+
+      updatedProducts.push({ product, originalQuantity });
     }
 
-    console.log(` Total amount calculated: ${total_amount}`);
-
-    if (!total_amount || total_amount <= 0 || isNaN(total_amount)) {
-      
+    if (total_amount <= 0) {
       for (const { product, originalQuantity } of updatedProducts) {
         product.quantity = originalQuantity;
         await product.save();
       }
-      throw new AppError("Invalid total amount calculated", 400);
+      throw new AppError("Invalid total amount", 400);
     }
 
     const order = await Order.create({
       buyer_id,
-      shop_id,
+      shop_id: derivedShopId,  
       total_amount,
       status: "pending",
       payment_status: "unpaid",
       escrow_status: "pending",
     });
-
-    console.log(" Order created:", order._id);
 
     const finalItems = orderItems.map(i => ({
       ...i,
@@ -125,15 +127,14 @@ const createOrder = async (buyer_id, shop_id, items) => {
 
     const createdItems = await OrderItem.insertMany(finalItems);
 
-    console.log(" Order items created");
-
     return { order, orderItems: createdItems };
 
   } catch (error) {
-    console.error(" Error in createOrder:", error.message);
+    console.error("Error in createOrder:", error.message);
     throw error;
   }
 };
+
 
 const getOrdersByBuyer = async (buyer_id) =>
   await Order.find({ buyer_id }).populate("shop_id");

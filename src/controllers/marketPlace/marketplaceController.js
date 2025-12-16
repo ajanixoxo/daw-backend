@@ -143,7 +143,7 @@ const getProductsByShop = asyncHandler(async (req, res) => {
 
 // Place an order (buyer)
 const createOrder = asyncHandler(async (req, res) => {
-  const { items, shop_id } = req.body;
+  const { items } = req.body;
   const buyer_id = req.user._id;
 
   if (!items || items.length === 0) {
@@ -151,7 +151,7 @@ const createOrder = asyncHandler(async (req, res) => {
   }
 
   const { order, orderItems } =
-    await marketplaceService.createOrder(buyer_id, shop_id, items);
+    await marketplaceService.createOrder(buyer_id, items);
 
   res.status(201).json({
     success: true,
