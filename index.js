@@ -18,15 +18,17 @@ const kycRoutes = require('@routes/kycRoutes/kyc.js');
 const { startCronJobs } = require('@jobs/monthlyContribution.cron.js');
 const globalErrorHandler = require("./src/middlewares/errorMiddleware");
 const { addPath } = require('module-alias');
-
-
-
-
+const { vigipayWebhook } = require("@controllers/wallet/webhook/vigipayWebhook.controller.js");
+const walletRoutes = require("@routes/wallet/wallet.routes.js");
+//webhook
 
 dotenv.config();
 connectDB();
 
 const app = express();
+
+app.post('/api/v1/webhook/vigipay', express.raw({ type: 'application/json' }), vigipayWebhook);
+
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
@@ -69,6 +71,7 @@ app.use('/marketplace', extraMarketPlaceRoutes);
 
 app.use('/api', paymentRoute);
 app.use('/kyc', kycRoutes);
+app.use('/api/wallet', walletRoutes);
 
 app.get('/', (req,res) => {
     res.send("Welcome to the DAW application!");
