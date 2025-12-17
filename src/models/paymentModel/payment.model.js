@@ -22,6 +22,10 @@ const PaymentSchema = new mongoose.Schema(
     charge: Number,
 
     rawResponse: Object,
+    orderId: {
+      type: String,
+      // ref: "Order",
+    },
     name: String,
     email: String,
     phone: String,
