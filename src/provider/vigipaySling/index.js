@@ -14,7 +14,7 @@ exports.createPayment = async (req, res) => {
     }
 
     const {
-      //amount,
+      // amount,
       orderId,
       description,
       name,
@@ -29,8 +29,8 @@ exports.createPayment = async (req, res) => {
       logisticsInfo,
     } = req.body;
 
-    if (!amount) {
-      return res.status(400).json({ message: "Amount is required" });
+    if (!orderId) {
+      throw new AppError("Order ID is required", 400);
     }
 
     const order = await Order.findOne({
