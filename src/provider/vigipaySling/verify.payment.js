@@ -1,11 +1,12 @@
 const axios = require("axios");
 const Payment = require("@models/paymentModel/payment.model.js");
+// const walletLedger = require("@models/walletLedger/ledger.js");
+const Order = require("@models/marketPlace/orderModel.js");
 // const https = require("https");
 
 // const agent = new https.Agent({
 //   rejectUnauthorized: false,
 // });
-
 
 exports.verifyPayment = async (req, res) => {
   try {
@@ -29,8 +30,25 @@ exports.verifyPayment = async (req, res) => {
 
     await payment.save();
 
-    // if (payment.vigipayStatus === "successful") {
-    // }
+    if (payment.vigipayStatus === "successful") {
+      const order = await Order.findById(payment.orderId);
+      if (!order) throw new Error("Order not found");
+
+      order.payment_status = "paid";
+      order.escrow_status = "held";
+      order.status = "processing"; 
+      await order.save();
+      //if order = delivered then fund the sellers wallet
+      // await walletLedger.create({
+      //   userId: order.seller_id,
+      //   reference: `order-${order._id}`,
+      //   type: "CREDIT",
+      //   amount: payment.amountAfterCharge,
+      //   status: "SUCCESS",
+      //   description: `Payment received for order ${order._id}`,
+      //   rawWebhookPayload: data,
+      // });
+    }
 
     return res.json({
       success: true,
