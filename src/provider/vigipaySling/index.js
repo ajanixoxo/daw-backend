@@ -1,6 +1,8 @@
 const axios = require("axios");
 const Payment = require("@models/paymentModel/payment.model.js");
 const User = require("@models/userModel/user.js");
+const Order = require("@models/marketPlace/orderModel.js");
+const AppError = require("@utils/Error/AppError.js");
 
 exports.createPayment = async (req, res) => {
   try {
@@ -12,7 +14,8 @@ exports.createPayment = async (req, res) => {
     }
 
     const {
-      amount,
+      //amount,
+      orderId,
       description,
       name,
       email,
@@ -30,8 +33,20 @@ exports.createPayment = async (req, res) => {
       return res.status(400).json({ message: "Amount is required" });
     }
 
+    const order = await Order.findOne({
+      _id: orderId,
+      buyer_id: req.user._id,
+      payment_status: "unpaid",
+    });
+
+    if (!order) {
+      throw new AppError("Invalid or already paid order", 400);
+    }
+
+    const amount = order.total_amount;
+
     const payload = {
-      customerReference: user._id.toString(),
+      customerReference: order._id.toString(),
       amount,
       description: description || "Order Payment",
       customerName: name || `${user.firstName} ${user.lastName}`,
@@ -49,13 +64,16 @@ exports.createPayment = async (req, res) => {
     const data = response?.data?.responseData;
 
     if (!data) {
-      return res.status(500).json({ message: "Invalid response from payment gateway" });
+      return res
+        .status(500)
+        .json({ message: "Invalid response from payment gateway" });
     }
 
     const payment = await Payment.create({
       userId: user._id,
 
       amount,
+      orderId: order._id,
       description: payload.description,
 
       transactionReference: data.transactionReference,
@@ -85,7 +103,6 @@ exports.createPayment = async (req, res) => {
       reference: data.transactionReference,
       redirectUrl: data.redirectUrl,
     });
-
   } catch (err) {
     console.error("Create payment error:", err);
     return res.status(500).json({ message: err.message });
