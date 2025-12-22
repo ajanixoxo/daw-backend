@@ -3,33 +3,36 @@ const User = require("../../models/userModel/user.js");
 
 exports.createStatic = async (req, res) => {
   try {
-    const userId = req.user._id; 
-    const{ bvn, dateOfBirth } = req.body;
+    const userId = req.user._id;
+    const { bvn, dateOfBirth } = req.body;
 
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    
-    if (user.walletId) {
-      return res.status(400).json({ message: "Wallet already exists" });
+    if (user.accountId) {
+      return res.status(400).json({ message: "Account already exists" });
     }
-
+    // console.log("Vigipay Response:");
     const response = await vigipayClient.post("/api/VirtualAccount/create", {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      phoneNumber:user.phone,
+      phoneNumber: user.phone,
       bvn,
       dateOfBirth,
       webhookUrl: process.env.WEBHOOK_URL,
     });
-
+    console.log("Vigipay Response:", response);
     const accountId = response.data.responseData.accountId;
-
+    console.log("Vigipay Account ID:", accountId);
     // Save accountId to user
     user.accountId = accountId;
+    user.accountNo = response.data.responseData.accountNo;
+    user.accountName = response.data.responseData.accountName;
+    user.bankName = response.data.responseData.bankName;
+    user.bankCode = response.data.responseData.bankCode;
     await user.save();
 
     return res.status(201).json({
@@ -45,33 +48,41 @@ exports.createStatic = async (req, res) => {
   }
 };
 
-
-exports.getBusinessWallet = async( req, res ) => {
+exports.getBusinessWallet = async (req, res) => {
   try {
     const userId = req.user._id;
+
     const user = await User.findById(userId);
-    if (!user || !user.walletId) {
-      return res.status(404).json({ message: "Wallet not found" });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
-    const response = await vigipayClient.get(`/api/Wallet/businessWallet`);
+    const response = await vigipayClient.get("/api/Wallet/businessWallet");
 
     const walletData = response.data.responseData.walletID;
+    const currentBalance = response.data.responseData.currentBalance;
 
-    user.walletId = walletData;
+    if (!user.walletId) {
+      user.walletId = walletData;
+    }
+
+    user.wallet_balance = currentBalance;
+
     await user.save();
 
     return res.status(200).json({
       message: "Wallet retrieved successfully",
       data: response.data.responseData,
     });
+
   } catch (error) {
     return res.status(500).json({
-      message: "failed to fetch wallet",
+      message: "Failed to fetch wallet",
       error: error.response?.data || error.message,
     });
   }
 };
+
 
 //update walletPin
 exports.updateWalletPin = async (req, res) => {
@@ -99,7 +110,6 @@ exports.updateWalletPin = async (req, res) => {
       message: "Wallet PIN updated successfully",
       data: response.data,
     });
-
   } catch (error) {
     return res.status(500).json({
       message: "Failed to update wallet PIN",
@@ -114,11 +124,28 @@ exports.processPayout = async (req, res) => {
     const userId = req.user._id;
     const { pin, amount, bankCode, accountNumber, accountName } = req.body;
 
-    
     const user = await User.findById(userId);
     if (!user || !user.walletId) {
       return res.status(404).json({ message: "Wallet not found" });
     }
+
+    const existingLedger = await WalletLedger.findOne({
+      reference,
+      type: "DEBIT",
+    });
+
+    if (existingLedger) {
+      return res.status(409).json({
+        message: "Payout already processed",
+      });
+    }
+
+    if (existingLedger) {
+      return res.status(409).json({
+        message: "Payout already processed",
+      });
+    }
+
 
     const chargeRes = await vigipayClient.post("/api/Wallet/charge", {
       amount,
@@ -127,12 +154,9 @@ exports.processPayout = async (req, res) => {
 
     const { totalAmount } = chargeRes.data.responseData;
 
-    
     const balanceRes = await vigipayClient.get("/api/Wallet/businessWallet");
-    const availableBalance =
-      balanceRes.data.responseData.availableBalance;
+    const availableBalance = balanceRes.data.responseData.availableBalance;
 
-  
     if (availableBalance < totalAmount) {
       return res.status(400).json({
         message: "Insufficient wallet balance",
@@ -141,33 +165,49 @@ exports.processPayout = async (req, res) => {
       });
     }
 
-    
-    const payoutRes = await vigipayClient.post(
-      "/api/Wallet/transfer/account",
-      {
-        senderWalletId: user.walletId,
-        pin,
-        amount,
-        bankCode,
-        accountNumber,
-        accountName,
-      }
-    );
+    const ledger = await WalletLedger.create({
+      userId: user._id,
+      walletId: user.walletId,
+      reference,
+      type: "DEBIT",
+      amount,
+      status: "PENDING",
+      beneficiaryAccount: accountNumber,
+      channel: "vigipay",
+      transactionDate: new Date(),
+    });
+
+    const payoutRes = await vigipayClient.post("/api/Wallet/transfer/account", {
+      senderWalletId: user.walletId,
+      pin,
+      amount,
+      bankCode,
+      accountNumber,
+      accountName,
+    });
+
+    ledger.status = "SUCCESS";
+    ledger.rawWebhookPayload = payoutRes.data;
+    await ledger.save();
 
     return res.status(200).json({
       message: "Payout initiated",
       data: payoutRes.data,
     });
-
   } catch (error) {
+    if (reference) {
+      await WalletLedger.findOneAndUpdate(
+        { reference },
+        { status: "FAILED" }
+      );
+    }
+
     return res.status(500).json({
       message: "Payout failed",
       error: error.response?.data || error.message,
     });
   }
 };
-
-
 
 //payout charges
 exports.getPayoutCharge = async (req, res) => {
@@ -183,7 +223,6 @@ exports.getPayoutCharge = async (req, res) => {
       message: "Charge retrieved successfully",
       data: response.data.responseData,
     });
-
   } catch (error) {
     return res.status(500).json({
       message: "Failed to get payout charge",
@@ -212,7 +251,6 @@ exports.accountLookup = async (req, res) => {
       message: "Account verified successfully",
       data: response.data.responseData,
     });
-
   } catch (error) {
     return res.status(500).json({
       message: "Account verification failed",
@@ -224,18 +262,14 @@ exports.accountLookup = async (req, res) => {
 //banks
 exports.getBanks = async (req, res) => {
   try {
-    const response = await vigipayClient.get(
-      "/api/Wallet/banks",
-      {
-        baseURL: process.env.VIGIPAY_CUSTOMER_BASE_URL,
-      }
-    );
+    const response = await vigipayClient.get("/api/Wallet/banks", {
+      baseURL: process.env.VIGIPAY_CUSTOMER_BASE_URL,
+    });
 
     return res.status(200).json({
       message: "Banks retrieved successfully",
       data: response.data.responseData,
     });
-
   } catch (error) {
     return res.status(500).json({
       message: "Failed to fetch banks",
@@ -243,3 +277,35 @@ exports.getBanks = async (req, res) => {
     });
   }
 };
+
+//get account details 
+exports.getAccount = async( res, req) => {
+  try{
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    if(!user){
+      res.status(400).josn({
+        success:"false",
+        message:"User did not exist "
+      })
+    }
+
+    const response = await vigipayClient(`/api/VirtualAccount/get?accountId=${user.accountId}`);
+  
+    user.aacount_Balance = response.data.responseData.accountBalance;
+    await user.save();
+
+    return res.status(200).json({
+       success: "True",
+       message:"Response fetched successfully",
+       response: response.data.responseData,
+    })
+
+  }catch(error){
+    console.log("Error during fetching usewr account");
+    return res.status(500).json({
+      message:"Error in fetching the account",
+      error: error.message
+    });
+  }
+}

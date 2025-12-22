@@ -4,7 +4,7 @@ const verifyVigipaySignature = require("@utils/vigipayClient/verifyWebhook.js");
 
 exports.vigipayWebhook = async (req, res) => {
   try {
-    
+     console.log("listening webhook")
     const isValid = verifyVigipaySignature(req);
     if (!isValid) {
       return res.status(401).json({ message: "Invalid signature" });
@@ -26,15 +26,25 @@ exports.vigipayWebhook = async (req, res) => {
       CustomerId,
     } = Data;
 
-  
-    const existingTxn = await WalletLedger.findOne({ reference: Reference });
-    if (existingTxn) {
-      return res.status(200).json({ message: "Duplicate webhook ignored" });
+    let ledger = await WalletLedger.findOne({ reference: Reference });
+
+
+    let user = null;
+    if (!ledger) {
+      user = await User.findOne({ walletId: CustomerId });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
     }
 
-    const user = await User.findOne({ walletId: CustomerId });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    if (ledger) {
+      ledger.status = Status === "Successful" ? "SUCCESS" : "FAILED";
+      ledger.transactionDate = new Date(TransactionDate);
+      ledger.beneficiaryAccount = BeneficiaryAccount;
+      ledger.rawWebhookPayload = req.body;
+      await ledger.save();
+
+      return res.status(200).json({ message: "Ledger updated successfully" });
     }
 
     await WalletLedger.create({
@@ -50,7 +60,7 @@ exports.vigipayWebhook = async (req, res) => {
       rawWebhookPayload: req.body,
     });
 
-    return res.status(200).json({ message: "Webhook processed successfully" });
+    return res.status(200).json({ message: "Ledger created from webhook" });
 
   } catch (error) {
     console.error("Webhook Error:", error);
