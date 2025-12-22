@@ -190,7 +190,7 @@ const getReviews = async (product_id, options = {}) => {
   ]);
 
   const ratingDistribution = await Review.aggregate([
-    { $match: { product_id: mongoose.Types.ObjectId(product_id) } },
+    { $match: { product_id: new mongoose.Types.ObjectId(product_id) } },
     {
       $group: {
         _id: '$rating',
@@ -219,7 +219,7 @@ const getReviews = async (product_id, options = {}) => {
 
 const updateProductRating = async (product_id) => {
   const stats = await Review.aggregate([
-    { $match: { product_id: mongoose.Types.ObjectId(product_id) } },
+    { $match: { product_id: new mongoose.Types.ObjectId(product_id) } },
     {
       $group: {
         _id: null,

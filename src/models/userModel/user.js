@@ -140,10 +140,29 @@ const UserSchema = new mongoose.Schema(
     accountId: {
       type: String,
     },
+    accountNo: {
+      type: String,
+    },
     pin: {
       type: String,
       select: false,
     },
+    accountName: {
+      type: String,
+    },
+    bankName: {
+      type: String,
+    },
+    bankCode: {
+      type: String,
+    },
+    aacount_Balance: {
+      type: Number,
+    },
+    wallet_balance: {
+      type: Number,
+    }
+    
   },
   { timestamps: true }
 );
