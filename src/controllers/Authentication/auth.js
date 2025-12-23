@@ -27,7 +27,52 @@ const registerUser = asyncHandler(async (req, res) => {
       roles,
     } = req.body;
 
-    if (!firstName || !email || !password || !phone || !roles) {
+    // Normalize roles
+    let normalizedRoles = roles;
+    
+    // Handle different input types
+    if (!normalizedRoles || normalizedRoles === null || normalizedRoles === undefined) {
+      normalizedRoles = ["buyer"];
+    } else if (typeof normalizedRoles === "string") {
+      // Convert string to array (e.g., "seller" -> ["seller"])
+      normalizedRoles = [normalizedRoles];
+    } else if (!Array.isArray(normalizedRoles)) {
+      // For other non-array types, default to buyer
+      normalizedRoles = ["buyer"];
+    } else if (normalizedRoles.length === 0) {
+      // Empty array defaults to buyer
+      normalizedRoles = ["buyer"];
+    }
+
+    const rolesSet = new Set();
+
+    // Admin role (special role, doesn't require buyer)
+    if (normalizedRoles.includes("admin")) {
+      rolesSet.add("admin");
+    }
+
+    // Seller must always include buyer
+    if (normalizedRoles.includes("seller")) {
+      rolesSet.add("seller");
+      rolesSet.add("buyer");
+    }
+
+    // Cooperative logic (if needed)
+    if (normalizedRoles.includes("cooperative")) {
+      rolesSet.add("cooperative");
+      rolesSet.add("buyer"); // optional but recommended
+    }
+
+    // Always allow buyer (if explicitly provided or if no other roles, but not if admin only)
+    if (normalizedRoles.includes("buyer") || (rolesSet.size === 0 && !normalizedRoles.includes("admin"))) {
+      rolesSet.add("buyer");
+    }
+
+    // Final roles
+    const finalRoles = [...rolesSet];
+    
+
+    if (!firstName || !email || !password || !phone || !finalRoles) {
       throw new AppError("All fields are required", 400);
     }
 
@@ -56,7 +101,7 @@ const registerUser = asyncHandler(async (req, res) => {
       password,
       isVerified: false,
       phone,
-      roles,
+      roles: finalRoles,
       otp,
       otpExpiry,
     });
