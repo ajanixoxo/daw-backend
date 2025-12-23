@@ -6,21 +6,21 @@ const { restrictTo, protect } = require('@middlewares/authMiddleware.js');
 
 router.post('/create/static/Account', protect, restrictTo("seller"), walletController.createStatic);
 
-router.get('/create', protect, restrictTo("Admin"), walletController.getBusinessWallet);
+router.get('/create', protect, restrictTo("admin"), walletController.getBusinessWallet);
 
-router.post("/charge", protect, restrictTo("Admin"), walletController.getPayoutCharge);
+router.post("/charge", protect, restrictTo("admin"), walletController.getPayoutCharge);
 
 // Account lookup
-router.post("/account-lookup", protect,restrictTo("seller", "Admin"), walletController.accountLookup);
+router.post("/account-lookup", protect,restrictTo("seller", "admin"), walletController.accountLookup);
 
 // Banks list
-router.get("/banks", protect,restrictTo("seller","Admin"), walletController.getBanks);
+router.get("/banks", protect,restrictTo("seller","admin"), walletController.getBanks);
 
-router.post('/payout', protect,restrictTo("Admin"), walletController.processPayout);
+router.post('/payout', protect,restrictTo("admin"), walletController.processPayout);
 
 // Update PIN
-router.put("/update-pin", protect, restrictTo("Admin"), walletController.updateWalletPin);
+router.put("/update-pin", protect, restrictTo("admin"), walletController.updateWalletPin);
 
-router.get("/get/account", protect, restrictTo("seller", "Admin"), walletController.getAccount);
+router.get("/get/account", protect, restrictTo("seller", "admin"), walletController.getAccount);
 
 module.exports = router;
