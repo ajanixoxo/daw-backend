@@ -23,4 +23,5 @@ router.put("/update-pin", protect, restrictTo("admin"), walletController.updateW
 
 router.get("/get/account", protect, restrictTo("seller", "admin"), walletController.getAccount);
 
+router.get('/ledger', protect, restrictTo('admin'), walletController.walletLedgerController);
 module.exports = router;
