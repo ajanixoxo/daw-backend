@@ -17,7 +17,7 @@ const vigipayClient = axios.create({
 vigipayClient.interceptors.request.use(async (config) => {
   const token = await loginAndGetToken();
   config.headers.Authorization = `Bearer ${token}`;
-  // console.log("token", token, "added to headers", config.headers);
+  console.log("token", token, "added to headers", config.headers);
   return config;
 });
 
