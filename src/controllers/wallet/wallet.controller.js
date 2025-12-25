@@ -1,5 +1,6 @@
 const vigipayClient = require("../../utils/vigipayClient/vigipayClient.js");
 const User = require("../../models/userModel/user.js");
+const walletLedger = require('../../models/walletLedger/ledger.js');
 
 exports.createStatic = async (req, res) => {
   try {
@@ -56,8 +57,9 @@ exports.getBusinessWallet = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-
+    console.log("vigipay starting")
     const response = await vigipayClient.get("/api/Wallet/businessWallet");
+    console.log("response for wallet from vigipay", response);
 
     const walletData = response.data.responseData.walletID;
     const currentBalance = response.data.responseData.currentBalance;
@@ -302,7 +304,44 @@ exports.getAccount = async( res, req) => {
     })
 
   }catch(error){
-    console.log("Error during fetching usewr account");
+    console.log("Error during fetching user account");
+    return res.status(500).json({
+      message:"Error in fetching the account",
+      error: error.message
+    });
+  }
+};
+
+
+exports.walletLedgerController = async(req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await user.findById(userId);
+
+    if(!user){
+        return res.status(400).json({
+        success: false,
+        message:"User does not exist"
+      });
+     }
+     
+    const wallet = await walletLedger.find();
+    // console.log("wallet ledger", wallet);
+    if(!wallet){
+      return res.status(400).json({
+        success: false,
+        message:"Wallet does not exist"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message:"Wallet fetched successfully",
+      walletLedger: wallet
+    });
+
+  } catch (error) {
+    console.log("Error during fetching wallet ledger");
     return res.status(500).json({
       message:"Error in fetching the account",
       error: error.message
