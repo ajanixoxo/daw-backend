@@ -361,13 +361,18 @@ async function loginOTP(req, res) {
 
     User.password = undefined;
 
+    // Check if user has any shops
+    const shopCount = await Shop.countDocuments({ owner_id: userId });
+    const userObject = User.toObject();
+    userObject.hasShop = shopCount > 0;
+
     res.json({
       message: "Login successful",
       token: {
         accessToken,
         refreshToken,
       },
-      user: User,
+      user: userObject,
     });
   } catch (error) {
     console.error("Error in verifying OTP:", error);
