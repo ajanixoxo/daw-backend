@@ -28,5 +28,6 @@ router.get(
 
     marketplaceController.getOrdersByShop
 );
+router.get('/get/seller/details', protect, restrictTo('admin'), marketplaceController.getSellerDetails);
 
 module.exports = router;

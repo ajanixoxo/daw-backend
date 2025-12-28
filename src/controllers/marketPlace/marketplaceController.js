@@ -4,6 +4,7 @@ const marketplaceService = require("@services/marketPlace/marketPlaceServices.js
 const AppError = require('@utils/Error/AppError.js');
 const User = require("@models/userModel/user.js");
 const Shop = require("@models/marketPlace/shopModel.js");
+const Order = require("@models/marketPlace/orderModel.js");
 
 // Create a new shop
 const createShop = asyncHandler(async (req, res) => {
@@ -238,6 +239,45 @@ const getOrdersByShop = asyncHandler(async (req, res) => {
   });
 });
 
+const getSellerDetails = asyncHandler(async (req, res) => {
+  const { orderId } = req.query;
+
+  if (!orderId) {
+    throw new AppError("orderId is required", 400);
+  }
+
+  const orderDetails = await Order.findById(orderId);
+  if (!orderDetails) {
+    throw new AppError("Order does not exist", 404);
+  }
+
+  const shopDetails = await Shop.findById(orderDetails.shop_id);
+  if (!shopDetails) {
+    throw new AppError("Shop does not exist", 404);
+  }
+
+  const userDetails = await User.findById(shopDetails.owner_id)
+    .select(
+      "firstName lastName email phone accountName accountNo bankCode bankName accountId"
+    ); 
+
+  if (!userDetails) {
+    throw new AppError("Seller does not exist", 404);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Seller details fetched successfully",
+    seller: userDetails,
+    order: {
+      paymentStatus: orderDetails.payment_status,
+      totalAmount: orderDetails.total_amount,
+      escrowStatus: orderDetails.escrow_status,
+    },
+    shop: shopDetails,
+  });
+});
+
 
 module.exports = {
   createShop,
@@ -250,5 +290,6 @@ module.exports = {
   getOrdersByBuyer,
   getoRdersById,
   getAllProduct,
-  getProduct
+  getProduct,
+  getSellerDetails
 }
