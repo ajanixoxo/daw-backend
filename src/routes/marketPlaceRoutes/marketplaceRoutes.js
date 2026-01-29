@@ -1,11 +1,19 @@
 const express = require('express');
 const {
-    protect,
-    restrictTo
+  protect,
+  protectOptional,
+  restrictTo,
 } = require('@middlewares/authMiddleware.js');
 const marketplaceController = require('@controllers/marketPlace/marketplaceController.js');
+const { sellerOnboardUpload } = require('@middlewares/uploadMiddleware.js');
 
 const router = express.Router();
+
+// Seller onboarding (multipart: shop info + documents) — non-cooperative sellers
+router.post("/seller-onboard", protect, restrictTo("admin", "seller", "buyer"), sellerOnboardUpload, marketplaceController.sellerOnboard);
+// Combined: guest/buyer → create user (if guest) + seller onboard + join DAW cooperative (optional auth)
+router.post("/cooperative-join-with-seller-onboard", protectOptional, sellerOnboardUpload, marketplaceController.cooperativeJoinWithSellerOnboard);
+router.get("/seller-documents/me", protect, marketplaceController.getMySellerDocuments);
 
 // Shops
 router.post("/create/shops", protect, restrictTo("admin", "seller", "buyer"), marketplaceController.createShop);

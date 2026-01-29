@@ -13,6 +13,23 @@ const protect = (req, res, next) => {
   }
 };
 
+/** Optional auth: if token present and valid, set req.user; otherwise req.user is undefined. Never 401. */
+const protectOptional = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    req.user = undefined;
+    return next();
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    req.user = undefined;
+    next();
+  }
+};
+
 const restrictTo = (...allowedRoles) => {
   return (req, res, next) => {
     const userRoles = Array.isArray(req.user.roles)
@@ -33,6 +50,7 @@ const restrictTo = (...allowedRoles) => {
 };
 
 module.exports = {
-    protect,
-    restrictTo
-}
+  protect,
+  protectOptional,
+  restrictTo,
+};

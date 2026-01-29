@@ -5,8 +5,14 @@ const OrderItem = require("@models/marketPlace/orderItemModel.js");
 const AppError = require("@utils/Error/AppError.js");
 const mongoose = require("mongoose");
 
-// SHOP
-const createShop = async (data) => await Shop.create(data);
+// SHOP — one shop per user (business rule)
+const createShop = async (data) => {
+  const existing = await Shop.findOne({ owner_id: data.owner_id });
+  if (existing) {
+    throw new AppError("User already has a shop", 400);
+  }
+  return Shop.create(data);
+};
 const getShops = async () => await Shop.find();
 const getShopById = async (id) => await Shop.findById(id);
 

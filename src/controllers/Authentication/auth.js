@@ -23,7 +23,7 @@ const registerUser = asyncHandler(async (req, res) => {
       email,
       password,
       confirmPassword,
-      phone,
+      phone, 
       roles,
     } = req.body;
 
