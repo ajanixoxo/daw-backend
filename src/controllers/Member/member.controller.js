@@ -1,6 +1,11 @@
 const MemberService = require("../../services/member.service.js");
 const User = require("../../models/userModel/user.js");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+const { verificationEmailTemplate } = require("@utils/EmailTemplate/template.js");
+
+const JWT_SECRET = process.env.JWT_SECRET;
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 /**
  * Controller goals:
@@ -112,6 +117,8 @@ const guestJoin = async (req, res) => {
     }
 
     // Create user with buyer role only; joinCooperative will add seller + cooperative and create shop
+    const otp = generateOTP();
+    const otpExpiry = Date.now() + 10 * 60 * 1000;
     const newUser = await User.create({
       firstName: (firstName || "").trim(),
       lastName: (lastName || "").trim(),
@@ -120,7 +127,19 @@ const guestJoin = async (req, res) => {
       phone: (phone || "").trim(),
       roles: ["buyer"],
       isVerified: false,
+      otp,
+      otpExpiry,
     });
+
+    await verificationEmailTemplate(newUser.email, newUser.firstName, otp);
+    if (!JWT_SECRET) {
+      return res.status(500).json({ error: "JWT_SECRET is not configured on the server" });
+    }
+    const tempToken = jwt.sign(
+      { _id: newUser._id, email: newUser.email },
+      JWT_SECRET,
+      { expiresIn: "15min" }
+    );
 
     const member = await MemberService.joinCooperative({
       userId: newUser._id,
@@ -129,8 +148,18 @@ const guestJoin = async (req, res) => {
     });
 
     return res.status(201).json({
-      message: "Account created and joined cooperative. Please log in.",
+      message: "Account created and joined cooperative. OTP sent to email for verification.",
       member,
+      token: tempToken,
+      user: {
+        _id: newUser._id,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        email: newUser.email,
+        phone: newUser.phone,
+        verified: newUser.isVerified,
+        roles: newUser.roles,
+      },
     });
   } catch (err) {
     return res.status(400).json({ error: err.message });

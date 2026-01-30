@@ -8,6 +8,11 @@ const Shop = require("@models/marketPlace/shopModel.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const SellerDocuments = require("@models/marketPlace/sellerDocumentsModel.js");
 const { uploadBuffer } = require("@utils/cloudinary/cloudinary.js");
+const jwt = require("jsonwebtoken");
+const { verificationEmailTemplate } = require("@utils/EmailTemplate/template.js");
+
+const JWT_SECRET = process.env.JWT_SECRET;
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 // Create a new shop
 const createShop = asyncHandler(async (req, res) => {
@@ -205,6 +210,8 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   const body = req.body || {};
   const files = req.files || {};
   let userId;
+  let guestUser = null;
+  let guestTempToken = null;
 
   if (!req.user || !req.user._id) {
     const { firstName, lastName, email, phone, password, confirmPassword } = body;
@@ -217,6 +224,10 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
     if (existingUser) {
       throw new AppError('User already exists. Please log in and use the cooperative signup flow.', 400);
     }
+
+    const otp = generateOTP();
+    const otpExpiry = Date.now() + 10 * 60 * 1000;
+
     const newUser = await User.create({
       firstName: (firstName || '').trim(),
       lastName: (lastName || '').trim(),
@@ -225,7 +236,27 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
       password,
       roles: ['buyer'],
       isVerified: false,
+      otp,
+      otpExpiry,
     });
+    await verificationEmailTemplate(newUser.email, newUser.firstName, otp);
+    if (!JWT_SECRET) {
+      throw new AppError("JWT_SECRET is not configured on the server", 500);
+    }
+    guestTempToken = jwt.sign(
+      { _id: newUser._id, email: newUser.email },
+      JWT_SECRET,
+      { expiresIn: "15min" }
+    );
+    guestUser = {
+      _id: newUser._id,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      email: newUser.email,
+      phone: newUser.phone,
+      verified: newUser.isVerified,
+      roles: newUser.roles,
+    };
     userId = newUser._id;
   } else {
     userId = req.user._id;
@@ -326,11 +357,12 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   res.status(201).json({
     success: true,
     message: isGuest
-      ? 'Account created, seller onboarded, and joined cooperative. Please log in.'
+      ? 'Account created, seller onboarded, and joined cooperative. OTP sent to email for verification.'
       : 'Seller onboarded and joined cooperative.',
     member,
     shop: { _id: shop._id, name: shop.name, status: shop.status },
     sellerDocuments: { _id: sellerDoc._id, status: sellerDoc.status },
+    ...(isGuest ? { token: guestTempToken, user: guestUser } : {}),
   });
 });
 
