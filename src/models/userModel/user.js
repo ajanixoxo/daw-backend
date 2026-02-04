@@ -105,6 +105,7 @@ const UserSchema = new mongoose.Schema(
         "cooperative",
         "member",
         "logistics_provider",
+        "cooperative_admin",
       ],
       required: true,
     },
@@ -169,7 +170,7 @@ const UserSchema = new mongoose.Schema(
     wallet_balance: {
       type: Number,
     }
-    
+
   },
   { timestamps: true }
 );
