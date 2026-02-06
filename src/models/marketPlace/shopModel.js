@@ -11,6 +11,11 @@ const shopSchema = new mongoose.Schema({
     ref: "Cooperative",
     default: null,
   },
+  product:{
+    type: mongoose.Schema.Types.ObjectId,
+    ref:'Product',
+    default: null,
+  },
   name: { type: String, required: true, trim: true },
   description: String,
   category: String,
