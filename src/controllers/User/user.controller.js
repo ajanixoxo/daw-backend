@@ -18,12 +18,11 @@ const upgradeToSeller = asyncHandler(async (req, res) => {
     // Get current roles array
     const currentRoles = Array.isArray(User.roles) ? User.roles : [];
 
-    // Only add "seller" if it's not already present
-    if (!currentRoles.includes('seller')) {
-      currentRoles.push('seller');
-      User.roles = currentRoles;
-      await User.save();
-    }
+    // Seller implies buyer (business rule). Only add seller if not already present.
+    if (!currentRoles.includes('buyer')) currentRoles.push('buyer');
+    if (!currentRoles.includes('seller')) currentRoles.push('seller');
+    User.roles = currentRoles;
+    await User.save();
 
     res.status(200).json({
       success: true,
@@ -58,12 +57,12 @@ const upgradeToCooperative = asyncHandler(async (req, res) => {
     // Get current roles array
     const currentRoles = Array.isArray(User.roles) ? User.roles : [];
 
-    // Only add "cooperative" if it's not already present
-    if (!currentRoles.includes('cooperative')) {
-      currentRoles.push('cooperative');
-      User.roles = currentRoles;
-      await User.save();
-    }
+    // Cooperative member has seller capability. Ensure cooperative, seller, and buyer.
+    if (!currentRoles.includes('buyer')) currentRoles.push('buyer');
+    if (!currentRoles.includes('seller')) currentRoles.push('seller');
+    if (!currentRoles.includes('cooperative')) currentRoles.push('cooperative');
+    User.roles = currentRoles;
+    await User.save();
 
     res.status(200).json({
       success: true,

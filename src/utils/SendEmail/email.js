@@ -15,7 +15,7 @@ const sendEmail = async (to, subject, html) => {
   });
 
   await transporter.sendMail({
-    from: `"DAW" <${process.env.EMAIL_USER}>`,
+    from: "DAW",
     to,
     subject,
     html,

@@ -1,5 +1,6 @@
 const express = require("express");
 const {
+  getDAWCooperative,
   createCooperative,
   listCooperatives,
   getCooperative,
@@ -8,6 +9,9 @@ const {
 const { protect, restrictTo } = require("@middlewares/authMiddleware.js");
 
 const router = express.Router();
+
+// Public: get the single DAW cooperative and its tiers (no auth)
+router.get("/daw", getDAWCooperative);
 
 router.post("/", protect, restrictTo("admin", "cooperative"), createCooperative);//make it admin specific
 router.put("/", protect, restrictTo("admin", "cooperative"), updateCooperative); 

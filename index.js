@@ -5,6 +5,7 @@ const cors = require('cors');
 const expressWinston = require('express-winston');
 const authRoutes = require('@routes/authRoutes/authRoutes.js');
 const connectDB = require('@config/db.js');
+const { seedDAWCooperative } = require('./src/scripts/seedDAWCooperative.js');
 const marketPlaceRoutes = require('@routes/marketPlaceRoutes/marketplaceRoutes.js')
 const extraMarketPlaceRoutes = require('@routes/marketPlaceRoutes/marketplaceExtraRoutes.js');
 const AppError = require('@utils/Error/AppError.js');
@@ -27,7 +28,7 @@ const logger = require('@utils/logger/logger.js');
 dotenv.config();
 connectDB();
 
-const app = express();
+const app = express(); 
 app.use(expressWinston.logger({
     winstonInstance: logger,
     meta: true,
@@ -105,8 +106,14 @@ app.use((req, res, next) => {
 
 app.use(globalErrorHandler);
 
-app.listen(PORT, () => {
+async function start() {
+  await connectDB();
+  await seedDAWCooperative();
+  app.listen(PORT, () => {
     console.log(`server is running on PORT ${PORT}`);
     startCronJobs();
     console.log("Cron jobs started");
-})
+  });
+}
+
+start();

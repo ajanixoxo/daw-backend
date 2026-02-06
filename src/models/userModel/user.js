@@ -53,6 +53,13 @@ const UserSchema = new mongoose.Schema(
       select: false,
     },
 
+    // Used across auth controllers (register/login/verify/resend). Keep this field name
+    // to match current controller usage (otpExpiry). See: src/controllers/Authentication/auth.js
+    otpExpiry: {
+      type: Date,
+      select: false,
+    },
+
     otpExpires: {
       type: Date,
     },
@@ -98,6 +105,7 @@ const UserSchema = new mongoose.Schema(
         "cooperative",
         "member",
         "logistics_provider",
+        "cooperative_admin",
       ],
       required: true,
     },
@@ -162,7 +170,7 @@ const UserSchema = new mongoose.Schema(
     wallet_balance: {
       type: Number,
     }
-    
+
   },
   { timestamps: true }
 );
