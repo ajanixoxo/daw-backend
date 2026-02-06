@@ -85,6 +85,12 @@ app.use('/kyc', kycRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/admin', dashboardRoutes);
 
+// Invitation Routes
+const adminInvitationRoutes = require('@routes/adminRoutes/invitation.routes.js');
+const publicInvitationRoutes = require('@routes/invitationRoutes/invitation.routes.js');
+app.use('/api/admin/users', adminInvitationRoutes);
+app.use('/api/users/invite', publicInvitationRoutes);
+
 app.get('/', (req, res) => {
   res.send("Welcome to the DAW application!");
 })
