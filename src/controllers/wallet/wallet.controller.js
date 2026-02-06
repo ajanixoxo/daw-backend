@@ -281,39 +281,50 @@ exports.getBanks = async (req, res) => {
 };
 
 //get account details 
-exports.getAccount = async( res, req) => {
-  try{
+exports.getAccount = async (req, res) => {
+  try {
     const userId = req.user._id;
+
     const user = await User.findById(userId);
-    if(!user){
-      res.status(400).josn({
-        success:"false",
-        message:"User did not exist "
-      })
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User does not exist",
+      });
     }
 
-    const response = await vigipayClient(`/api/VirtualAccount/get?accountId=${user.accountId}`);
-  
-    user.aacount_Balance = response.data.responseData.accountBalance;
+    console.log("seller details", user);
+
+    const response = await vigipayClient(
+      `/api/VirtualAccount/get?accountId=${user.accountId}`
+    );
+
+    // console.log("response", response);
+
+    user.account_Balance =
+      response.data.responseData.accountBalance;
+
     await user.save();
 
     return res.status(200).json({
-       success: "True",
-       message:"Response fetched successfully",
-       response: response.data.responseData,
-    })
+      success: true,
+      message: "Response fetched successfully",
+      response: response.data.responseData,
+    });
+  } catch (error) {
+    console.error("Error during fetching user account", error);
 
-  }catch(error){
-    console.log("Error during fetching user account");
     return res.status(500).json({
-      message:"Error in fetching the account",
-      error: error.message
+      success: false,
+      message: "Error in fetching the account",
+      error: error.message,
     });
   }
 };
 
 
-exports.walletLedgerController = async(req, res) => {
+
+exports.walletLedgerController = async(res, req) => {
   try {
     const userId = req.user._id;
     const user = await user.findById(userId);

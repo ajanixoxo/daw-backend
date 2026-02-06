@@ -2,6 +2,7 @@ require('module-alias/register');
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const expressWinston = require('express-winston');
 const authRoutes = require('@routes/authRoutes/authRoutes.js');
 const connectDB = require('@config/db.js');
 const marketPlaceRoutes = require('@routes/marketPlaceRoutes/marketplaceRoutes.js')
@@ -20,12 +21,20 @@ const globalErrorHandler = require("./src/middlewares/errorMiddleware");
 const { addPath } = require('module-alias');
 const { vigipayWebhook } = require("@controllers/wallet/webhook/vigipayWebhook.controller.js");
 const walletRoutes = require("@routes/wallet/wallet.routes.js");
+const logger = require('@utils/logger/logger.js');
 //webhook
 
 dotenv.config();
 connectDB();
 
 const app = express();
+app.use(expressWinston.logger({
+    winstonInstance: logger,
+    meta: true,
+    msg: "HTTP {{req.method}} {{req.url}}",
+    expressFormat: true,
+    colorize: false,
+}));
 
 app.post('/api/v1/webhook/vigipay', express.raw({ type: 'application/json' }), vigipayWebhook);
 
