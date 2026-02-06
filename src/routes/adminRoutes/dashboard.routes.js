@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getDashboardStats, getPendingCooperatives, getAllUsers } = require('../../controllers/admin/dashboard.controller.js');
+const { getDashboardStats, getPendingCooperatives, getAllUsers, getAnalyticsData } = require('../../controllers/admin/dashboard.controller.js');
 const asyncHandler = require('express-async-handler');
 
 
@@ -14,5 +14,8 @@ router.get('/cooperatives/pending', getPendingCooperatives);
 
 // GET /api/admin/users
 router.get('/users', getAllUsers);
+
+// GET /api/admin/analytics
+router.get('/analytics', getAnalyticsData);
 
 module.exports = router;
