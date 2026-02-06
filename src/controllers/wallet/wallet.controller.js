@@ -131,7 +131,7 @@ exports.processPayout = async (req, res) => {
       return res.status(404).json({ message: "Wallet not found" });
     }
 
-    const existingLedger = await WalletLedger.findOne({
+    const existingLedger = await walletLedger.findOne({
       reference,
       type: "DEBIT",
     });
@@ -167,7 +167,7 @@ exports.processPayout = async (req, res) => {
       });
     }
 
-    const ledger = await WalletLedger.create({
+    const ledger = await walletLedger.create({
       userId: user._id,
       walletId: user.walletId,
       reference,
@@ -198,7 +198,7 @@ exports.processPayout = async (req, res) => {
     });
   } catch (error) {
     if (reference) {
-      await WalletLedger.findOneAndUpdate(
+      await walletLedger.findOneAndUpdate(
         { reference },
         { status: "FAILED" }
       );

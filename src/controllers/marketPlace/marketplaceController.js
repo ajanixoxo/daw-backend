@@ -47,6 +47,7 @@ const createShop = asyncHandler(async (req, res) => {
     owner_id,
     cooperative_id: cooperative_id || null,
     name,
+    store_url,
     description,
     category,
     logo_url,
@@ -515,6 +516,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
 const getOrdersByShop = asyncHandler(async (req, res) => {
   const { shop_id } = req.params;
+   
   const shop = await Shop.findById(shop_id);
 
   if (!shop) {
@@ -589,6 +591,23 @@ const getSellerDetails = asyncHandler(async (req, res) => {
 });
 
 
+const editShops = asyncHandler(async (req, res) => {
+  const { id: shopId } = req.params;
+  const ownerId = req.user._id;
+
+  const updatedShop = await marketplaceService.editShop({
+    shopId,
+    ownerId,
+    data: req.body,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Shop updated successfully",
+    shop: updatedShop,
+  });
+});
+
 module.exports = {
   createShop,
   sellerOnboard,
@@ -604,5 +623,6 @@ module.exports = {
   getoRdersById,
   getAllProduct,
   getProduct,
-  getSellerDetails
+  getSellerDetails,
+  editShops
 }

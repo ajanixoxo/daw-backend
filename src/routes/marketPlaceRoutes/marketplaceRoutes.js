@@ -19,6 +19,7 @@ router.get("/seller-documents/me", protect, marketplaceController.getMySellerDoc
 router.post("/create/shops", protect, restrictTo("admin", "seller", "buyer"), marketplaceController.createShop);
 router.get("/get/shops", marketplaceController.getShops);
 router.get("/get/shops/:id", marketplaceController.getShopById);
+router.put("/edit/shops/:id", protect, restrictTo("seller"), marketplaceController.editShops);
 
 // Products
 router.post("/add/products", protect, restrictTo("admin", "seller", "buyer"), marketplaceController.createProduct);
@@ -33,7 +34,7 @@ router.get("/get/orders/:orderId", protect, restrictTo("member", "buyer"), marke
 router.get(
     "/get/orders/shop/:shop_id",
     protect,
-
+    restrictTo("seller"),
     marketplaceController.getOrdersByShop
 );
 router.get('/get/seller/details', protect, restrictTo('admin'), marketplaceController.getSellerDetails);
