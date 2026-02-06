@@ -8,7 +8,49 @@ const mongoose = require("mongoose");
 // SHOP
 const createShop = async (data) => await Shop.create(data);
 const getShops = async () => await Shop.find();
-const getShopById = async (id) => await Shop.findById(id);
+const getShopById = async (id) =>{ 
+  await Shop.findById(id);
+
+}
+
+const editShop = async ({ shopId, ownerId, data }) => {
+  const allowedFields = [
+    "name",
+    "description",
+    "store_url",
+    "category",
+    "logo_url",
+    "banner_url",
+  ];
+
+  const filteredData = {};
+  Object.keys(data).forEach((key) => {
+    if (allowedFields.includes(key) && data[key] !== undefined) {
+      filteredData[key] = data[key];
+    }
+  });
+
+  if (Object.keys(filteredData).length === 0) {
+    throw new AppError("No valid fields provided", 400);
+  }
+
+  const shop = await Shop.findOne({
+    _id: shopId,
+    owner_id: ownerId,
+  });
+
+  if (!shop) {
+    throw new AppError("Shop not found or unauthorized", 404);
+  }
+
+  if (shop.status !== "active") {
+    throw new AppError("Cannot edit inactive shop", 403);
+  }
+
+  Object.assign(shop, filteredData);
+  return await shop.save();
+};
+
 
 // PRODUCT
 const createProduct = async ({ sellerId, shopId, name, quantity, price }) => {
@@ -199,6 +241,7 @@ module.exports = {
   createShop,
   getShops,
   getShopById,
+  editShop,
   createProduct,
   getProductsByShop,
   createOrder,
