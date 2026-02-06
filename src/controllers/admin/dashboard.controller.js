@@ -10,10 +10,30 @@ const Cooperative = require('@models/cooperativeModel/cooperative.model.js');
  */
 const getDashboardStats = asyncHandler(async (req, res) => {
     // 1. Active Users
-    const activeUsersCount = await User.countDocuments({ status: "active" });
+    // Fetching count of all users
+    const activeUsersCount = await User.countDocuments();
 
     // 2. Cooperatives Stats
-    const pendingCooperativesCount = await Cooperative.countDocuments({ status: "pending" });
+    // Pending Cooperatives = Cooperatives where the Admin's KYC is pending
+    const pendingCooperativesAgg = await Cooperative.aggregate([
+        {
+            $lookup: {
+                from: "users", // ensure this matches your actual collection name in MongoDB (usually lowercase plural)
+                localField: "adminId",
+                foreignField: "_id",
+                as: "admin"
+            }
+        },
+        { $unwind: "$admin" },
+        {
+            $match: {
+                "admin.kyc_status": { $ne: "verified" } // Pending if not verified (covers 'pending' and 'rejected' or null)
+            }
+        },
+        { $count: "count" }
+    ]);
+    const pendingCooperativesCount = pendingCooperativesAgg.length > 0 ? pendingCooperativesAgg[0].count : 0;
+
     const totalCooperativesCount = await Cooperative.countDocuments();
 
     // 3. Products Stats
@@ -38,11 +58,6 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     const totalLoansCount = loansStats.length > 0 ? loansStats[0].totalCount : 0;
     const totalLoansValue = loansStats.length > 0 ? loansStats[0].totalValue : 0;
 
-    // 5. Pending Approvals (Cooperatives List)
-    // Fetching a preview list here might be useful, or a separate endpoint.
-    // The prompt asked for "Pending Approval Table" to fetch from Cooperatives.
-    // We'll keep this endpoint for stats only to be clean.
-
     res.status(200).json({
         success: true,
         data: {
@@ -56,7 +71,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
                 label: "Cooperatives"
             },
             products: {
-                total: activeProductsCount, // Currently mapping "Total Products" on UI to "Active/Available"
+                total: activeProductsCount,
                 label: "Total Products"
             },
             loans: {
@@ -65,13 +80,55 @@ const getDashboardStats = asyncHandler(async (req, res) => {
                 label: "Total Loans Disbursed"
             },
             pendingApprovals: {
-                value: pendingCooperativesCount, // For the stat card
+                value: pendingCooperativesCount,
                 label: "Pending Approvals"
             }
         }
     });
 });
 
+/**
+ * Get Pending Cooperatives List
+ * GET /api/admin/cooperatives/pending
+ */
+const getPendingCooperatives = asyncHandler(async (req, res) => {
+    const pendingCoops = await Cooperative.aggregate([
+        {
+            $lookup: {
+                from: "users",
+                localField: "adminId",
+                foreignField: "_id",
+                as: "admin"
+            }
+        },
+        { $unwind: { path: "$admin", preserveNullAndEmptyArrays: true } },
+
+        {
+            $project: {
+                name: 1,
+                description: 1,
+                logoUrl: 1,
+                createdAt: 1,
+                // Project admin details needed for frontend
+                admin: {
+                    firstName: 1,
+                    lastName: 1,
+                    email: 1,
+                    kyc_status: 1
+                }
+            }
+        },
+        { $sort: { createdAt: -1 } }
+    ]);
+
+    res.status(200).json({
+        success: true,
+        count: pendingCoops.length,
+        data: pendingCoops
+    });
+});
+
 module.exports = {
-    getDashboardStats
+    getDashboardStats,
+    getPendingCooperatives
 };
