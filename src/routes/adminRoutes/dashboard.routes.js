@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getDashboardStats, getPendingCooperatives } = require('../../controllers/admin/dashboard.controller.js');
+const { getDashboardStats, getPendingCooperatives, getAllUsers } = require('../../controllers/admin/dashboard.controller.js');
 const asyncHandler = require('express-async-handler');
 
 
@@ -8,7 +8,11 @@ const asyncHandler = require('express-async-handler');
 router.get('/dashboard/stats', getDashboardStats);
 
 // GET /api/admin/cooperatives/pending
+// GET /api/admin/cooperatives/pending
 // Fetch pending cooperatives for the "Pending Approvals" table
 router.get('/cooperatives/pending', getPendingCooperatives);
+
+// GET /api/admin/users
+router.get('/users', getAllUsers);
 
 module.exports = router;

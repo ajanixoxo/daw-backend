@@ -58,6 +58,14 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     const totalLoansCount = loansStats.length > 0 ? loansStats[0].totalCount : 0;
     const totalLoansValue = loansStats.length > 0 ? loansStats[0].totalValue : 0;
 
+    // 5. New Stats for User Page
+    // Number of Sellers (Users with 'seller' role)
+    const numberOfSellers = await User.countDocuments({ roles: "seller" });
+
+    // Number of Categories (Distinct categories in products)
+    const categories = await Product.distinct("category");
+    const numberOfCategories = categories.length;
+
     res.status(200).json({
         success: true,
         data: {
@@ -82,6 +90,19 @@ const getDashboardStats = asyncHandler(async (req, res) => {
             pendingApprovals: {
                 value: pendingCooperativesCount,
                 label: "Pending Approvals"
+            },
+            // Add new stats
+            numberOfSellers: {
+                value: numberOfSellers,
+                subtitle: "Total Sellers"
+            },
+            numberOfCategories: {
+                value: numberOfCategories,
+                subtitle: "Active Categories"
+            },
+            totalUser: {
+                value: activeUsersCount,
+                percentageChange: 12.5 // Static for now, consistent with mock
             }
         }
     });
@@ -128,7 +149,52 @@ const getPendingCooperatives = asyncHandler(async (req, res) => {
     });
 });
 
+/**
+ * Get All Users (Admin)
+ * GET /api/admin/users
+ */
+const getAllUsers = asyncHandler(async (req, res) => {
+    // Pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Search
+    const searchQuery = req.query.search;
+    let query = {};
+    if (searchQuery) {
+        query = {
+            $or: [
+                { firstName: { $regex: searchQuery, $options: "i" } },
+                { lastName: { $regex: searchQuery, $options: "i" } },
+                { email: { $regex: searchQuery, $options: "i" } }
+            ]
+        };
+    }
+
+    const users = await User.find(query)
+        .select("-password -otp -otpExpiry -otpExpires -pin") // Exclude sensitive fields
+        .populate("shop", "name description") // Optional: Populate shop if needed
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    const totalUsers = await User.countDocuments(query);
+
+    res.status(200).json({
+        success: true,
+        count: users.length,
+        pagination: {
+            total: totalUsers,
+            page,
+            pages: Math.ceil(totalUsers / limit)
+        },
+        data: users
+    });
+});
+
 module.exports = {
     getDashboardStats,
-    getPendingCooperatives
+    getPendingCooperatives,
+    getAllUsers
 };
