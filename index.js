@@ -23,18 +23,19 @@ const { addPath } = require('module-alias');
 const { vigipayWebhook } = require("@controllers/wallet/webhook/vigipayWebhook.controller.js");
 const walletRoutes = require("@routes/wallet/wallet.routes.js");
 const logger = require('@utils/logger/logger.js');
+const dashboardRoutes = require('@routes/adminRoutes/dashboard.routes.js');
 //webhook
 
 dotenv.config();
 connectDB();
 
-const app = express(); 
+const app = express();
 app.use(expressWinston.logger({
-    winstonInstance: logger,
-    meta: true,
-    msg: "HTTP {{req.method}} {{req.url}}",
-    expressFormat: true,
-    colorize: false,
+  winstonInstance: logger,
+  meta: true,
+  msg: "HTTP {{req.method}} {{req.url}}",
+  expressFormat: true,
+  colorize: false,
 }));
 
 app.post('/api/v1/webhook/vigipay', express.raw({ type: 'application/json' }), vigipayWebhook);
@@ -43,25 +44,25 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-const allowedOrigins =[
+const allowedOrigins = [
   process.env.FRONTEND_URL,
   "http://localhost:3000",
-]  
+]
 
 const corsOptions = {
- origin: function (origin, callback) {
-      console.log(" Incoming origin:", origin);  
+  origin: function (origin, callback) {
+    console.log(" Incoming origin:", origin);
 
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    methods: ['GET', 'PUT', 'POST', 'DELETE','PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'platform'],
-    exposedHeaders: ['Authorization'],
-    credentials: true,
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'PUT', 'POST', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'platform'],
+  exposedHeaders: ['Authorization'],
+  credentials: true,
 }
 
 app.use(cors(corsOptions));
@@ -82,9 +83,10 @@ app.use('/marketplace', extraMarketPlaceRoutes);
 app.use('/api', paymentRoute);
 app.use('/kyc', kycRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/admin', dashboardRoutes);
 
-app.get('/', (req,res) => {
-    res.send("Welcome to the DAW application!");
+app.get('/', (req, res) => {
+  res.send("Welcome to the DAW application!");
 })
 
 app.use((req, res) => {
