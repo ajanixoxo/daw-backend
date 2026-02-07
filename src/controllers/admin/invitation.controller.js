@@ -6,11 +6,11 @@ const sendEmail = require('@utils/SendEmail/email.js');
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-// Role to signup URL mapping
+// Role to signup URL mapping - matches Next.js routing structure
 const ROLE_SIGNUP_URLS = {
     buyer: '/signup',
-    seller: '/sellers-signup',
-    member: '/cooperative-signup'
+    seller: '/sellers/sellers-signup',
+    member: '/cooperative/cooperative-signup'
 };
 
 /**

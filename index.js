@@ -85,10 +85,16 @@ app.use('/kyc', kycRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/admin', dashboardRoutes);
 
-// Invitation Routes
+// Admin User Management Routes (consolidated)
 const adminInvitationRoutes = require('@routes/adminRoutes/invitation.routes.js');
-const publicInvitationRoutes = require('@routes/invitationRoutes/invitation.routes.js');
+const adminUserRoutes = require('@routes/adminRoutes/user.routes.js');
+// Mount invitation routes first (more specific paths like /invite)
 app.use('/api/admin/users', adminInvitationRoutes);
+// Then mount user CRUD routes (/:id patterns)
+app.use('/api/admin/users', adminUserRoutes);
+
+// Public Invitation Routes
+const publicInvitationRoutes = require('@routes/invitationRoutes/invitation.routes.js');
 app.use('/api/users/invite', publicInvitationRoutes);
 
 app.get('/', (req, res) => {
