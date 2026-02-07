@@ -17,6 +17,7 @@ const shopSchema = new mongoose.Schema({
     default: null,
   },
   name: { type: String, required: true, trim: true },
+  store_url: { type: String, required: true, unique: true, trim: true },
   description: String,
   category: String,
   logo_url: String,
