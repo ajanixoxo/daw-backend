@@ -81,7 +81,7 @@ module.exports = {
     const u = await User.findById(userId);
     if (u) {
       const roles = new Set(Array.isArray(u.roles) ? u.roles : []);
-      roles.add("cooperative");
+      roles.add("member");
       u.roles = [...roles];
       await u.save();
     }
