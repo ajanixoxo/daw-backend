@@ -535,7 +535,7 @@ const getShopById = asyncHandler(async (req, res) => {
 
 // Create a product (seller/admin)
 const createProduct = asyncHandler(async (req, res) => {
-  const { shop_id, name, quantity, price } = req.body;
+  const { shop_id, name, quantity, price, category, description } = req.body;
 
   if (!shop_id) {
     throw new AppError("Shop ID is required", 400);
@@ -569,7 +569,9 @@ const createProduct = asyncHandler(async (req, res) => {
     shopId: shop_id,
     name,
     quantity,
-    price
+    price,
+    category,
+    description,
   });
 
   res.status(201).json({ success: true, product });

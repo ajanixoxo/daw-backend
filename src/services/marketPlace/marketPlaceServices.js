@@ -59,7 +59,7 @@ const editShop = async ({ shopId, ownerId, data }) => {
 
 
 // PRODUCT
-const createProduct = async ({ sellerId, shopId, name, quantity, price }) => {
+const createProduct = async ({ sellerId, shopId, name, quantity, price, category, description }) => {
   const shop = await Shop.findOne({
     _id: shopId,
     owner_id: sellerId,
@@ -92,6 +92,8 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price }) => {
     name,
     quantity,
     price,
+    category,
+    description,
   });
 };
 
