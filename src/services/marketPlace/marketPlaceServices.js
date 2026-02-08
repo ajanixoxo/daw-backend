@@ -14,19 +14,23 @@ const createShop = async (data) => {
   return Shop.create(data);
 };
 const getShops = async () => await Shop.find();
-const getShopById = async (id) =>{ 
-  await Shop.findById(id);
+const getShopById = async (id) => {
+  return await Shop.findById(id);
+};
 
-}
+const getShopByOwnerId = async (ownerId) => {
+  return await Shop.findOne({ owner_id: ownerId });
+};
 
 const editShop = async ({ shopId, ownerId, data }) => {
   const allowedFields = [
     "name",
     "description",
-    "store_url",
     "category",
     "logo_url",
     "banner_url",
+    "contact_number",
+    "business_address",
   ];
 
   const filteredData = {};
@@ -323,6 +327,7 @@ module.exports = {
   createShop,
   getShops,
   getShopById,
+  getShopByOwnerId,
   editShop,
   createProduct,
   editProduct,

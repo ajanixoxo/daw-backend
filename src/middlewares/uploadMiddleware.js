@@ -64,7 +64,20 @@ const productImagesUpload = multer({
   fileFilter: imageFileFilter,
 }).array("images", 4);
 
+/**
+ * Multer config for shop edit (logo and banner only).
+ */
+const shopEditUpload = multer({
+  storage: memoryStorage,
+  limits: { fileSize: MAX_FILE_SIZE },
+  fileFilter: imageFileFilter,
+}).fields([
+  { name: "shopLogo", maxCount: 1 },
+  { name: "shopBanner", maxCount: 1 },
+]);
+
 module.exports = {
   sellerOnboardUpload,
   productImagesUpload,
+  shopEditUpload,
 };

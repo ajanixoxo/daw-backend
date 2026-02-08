@@ -43,6 +43,12 @@ const createShop = asyncHandler(async (req, res) => {
     await foundUser.save();
   }
 
+  // Auto-generate store_url from shop name
+  const store_url = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') + '-' + Date.now();
+
   const shopData = {
     owner_id,
     cooperative_id: cooperative_id || null,
@@ -128,10 +134,16 @@ const sellerOnboard = asyncHandler(async (req, res) => {
     banner_url = r.secure_url;
   }
 
+  const store_url = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') + '-' + Date.now();
+
   const shopData = {
     owner_id,
     cooperative_id: null,
     name,
+    store_url,
     description,
     category,
     contact_number: contactNumber,
@@ -316,10 +328,16 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
     banner_url = r.secure_url;
   }
 
+  const coopStoreUrl = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') + '-' + Date.now();
+
   const shopData = {
     owner_id: userId,
     cooperative_id: cooperativeId,
     name,
+    store_url: coopStoreUrl,
     description,
     category,
     contact_number: contactNumber,
@@ -475,10 +493,16 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
     banner_url = r.secure_url;
   }
 
+  const guestStoreUrl = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') + '-' + Date.now();
+
   const shopData = {
     owner_id: userId,
     cooperative_id: null,
     name,
+    store_url: guestStoreUrl,
     description,
     category,
     contact_number: contactNumber,
@@ -869,14 +893,57 @@ const getSellerDetails = asyncHandler(async (req, res) => {
 });
 
 
+// Get the current user's shop
+const getMyShop = asyncHandler(async (req, res) => {
+  if (!req.user || !req.user._id) {
+    throw new AppError('User not authenticated', 401);
+  }
+
+  const shop = await marketplaceService.getShopByOwnerId(req.user._id);
+  if (!shop) {
+    return res.status(404).json({ success: false, message: 'Shop not found. Please create a shop first.' });
+  }
+
+  // Also get product count for this shop
+  const Product = require("@models/marketPlace/productModel.js");
+  const productCount = await Product.countDocuments({ shop_id: shop._id });
+
+  res.status(200).json({
+    success: true,
+    shop,
+    productCount,
+  });
+});
+
 const editShops = asyncHandler(async (req, res) => {
   const { id: shopId } = req.params;
   const ownerId = req.user._id;
+  const files = req.files || {};
+
+  const data = { ...req.body };
+
+  // Handle logo upload
+  const shopLogo = Array.isArray(files.shopLogo) ? files.shopLogo[0] : files.shopLogo;
+  if (shopLogo && shopLogo.buffer) {
+    const folderShop = 'daw/shops';
+    const prefix = `seller_${ownerId.toString()}`;
+    const r = await uploadBuffer(shopLogo.buffer, { folder: folderShop, publicIdPrefix: `${prefix}_logo` });
+    data.logo_url = r.secure_url;
+  }
+
+  // Handle banner upload
+  const shopBanner = Array.isArray(files.shopBanner) ? files.shopBanner[0] : files.shopBanner;
+  if (shopBanner && shopBanner.buffer) {
+    const folderShop = 'daw/shops';
+    const prefix = `seller_${ownerId.toString()}`;
+    const r = await uploadBuffer(shopBanner.buffer, { folder: folderShop, publicIdPrefix: `${prefix}_banner` });
+    data.banner_url = r.secure_url;
+  }
 
   const updatedShop = await marketplaceService.editShop({
     shopId,
     ownerId,
-    data: req.body,
+    data,
   });
 
   res.status(200).json({
@@ -892,6 +959,7 @@ module.exports = {
   guestSellerOnboard,
   cooperativeJoinWithSellerOnboard,
   getMySellerDocuments,
+  getMyShop,
   getShops,
   getShopById,
   createProduct,

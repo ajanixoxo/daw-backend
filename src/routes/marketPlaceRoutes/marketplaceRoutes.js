@@ -6,7 +6,7 @@ const {
 } = require('@middlewares/authMiddleware.js');
 const marketplaceController = require('@controllers/marketPlace/marketplaceController.js');
 const categoryController = require('@controllers/marketPlace/categoryController.js');
-const { sellerOnboardUpload, productImagesUpload } = require('@middlewares/uploadMiddleware.js');
+const { sellerOnboardUpload, productImagesUpload, shopEditUpload } = require('@middlewares/uploadMiddleware.js');
 
 const router = express.Router();
 
@@ -21,8 +21,9 @@ router.get("/seller-documents/me", protect, marketplaceController.getMySellerDoc
 // Shops
 router.post("/create/shops", protect, restrictTo("admin", "seller", "buyer"), marketplaceController.createShop);
 router.get("/get/shops", marketplaceController.getShops);
+router.get("/my-shop", protect, restrictTo("seller"), marketplaceController.getMyShop);
 router.get("/get/shops/:id", marketplaceController.getShopById);
-router.put("/edit/shops/:id", protect, restrictTo("seller"), marketplaceController.editShops);
+router.put("/edit/shops/:id", protect, restrictTo("seller"), shopEditUpload, marketplaceController.editShops);
 
 // Categories
 router.post("/categories", protect, restrictTo("admin", "seller"), categoryController.createCategory);
