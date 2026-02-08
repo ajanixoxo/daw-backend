@@ -59,7 +59,7 @@ const editShop = async ({ shopId, ownerId, data }) => {
 
 
 // PRODUCT
-const createProduct = async ({ sellerId, shopId, name, quantity, price, category, description }) => {
+const createProduct = async ({ sellerId, shopId, name, quantity, price, category, description, images, status, variants, productFeatures, careInstruction, returnPolicy }) => {
   const shop = await Shop.findOne({
     _id: shopId,
     owner_id: sellerId,
@@ -94,10 +94,84 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
     price,
     category,
     description,
+    images: images || [],
+    status: status || "available",
+    variants: variants || [],
+    productFeatures: productFeatures || "",
+    careInstruction: careInstruction || "",
+    returnPolicy: returnPolicy || "",
   });
 };
 
 const getProductsByShop = async (shop_id) => await Product.find({ shop_id });
+
+const editProduct = async ({ sellerId, productId, updates }) => {
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new AppError("Product not found", 404);
+  }
+
+  const shop = await Shop.findOne({
+    _id: product.shop_id,
+    owner_id: sellerId,
+    status: "active",
+  });
+
+  if (!shop) {
+    throw new AppError("Unauthorized or inactive shop", 403);
+  }
+
+  const allowedFields = [
+    "name", "description", "category", "quantity", "price",
+    "images", "status", "variants", "productFeatures",
+    "careInstruction", "returnPolicy",
+  ];
+
+  const filteredUpdates = {};
+  for (const key of Object.keys(updates)) {
+    if (allowedFields.includes(key) && updates[key] !== undefined) {
+      filteredUpdates[key] = updates[key];
+    }
+  }
+
+  if (Object.keys(filteredUpdates).length === 0) {
+    throw new AppError("No valid fields provided", 400);
+  }
+
+  // If renaming, check for duplicates (exclude self)
+  if (filteredUpdates.name) {
+    const duplicate = await Product.findOne({
+      shop_id: product.shop_id,
+      _id: { $ne: productId },
+      name: { $regex: `^${filteredUpdates.name}$`, $options: "i" },
+    });
+    if (duplicate) {
+      throw new AppError("Another product with this name already exists", 409);
+    }
+  }
+
+  Object.assign(product, filteredUpdates);
+  return await product.save();
+};
+
+const deleteProduct = async ({ sellerId, productId }) => {
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new AppError("Product not found", 404);
+  }
+
+  const shop = await Shop.findOne({
+    _id: product.shop_id,
+    owner_id: sellerId,
+  });
+
+  if (!shop) {
+    throw new AppError("Unauthorized to delete this product", 403);
+  }
+
+  await Product.findByIdAndDelete(productId);
+  return { message: "Product deleted successfully" };
+};
 
 // ORDER
 const createOrder = async (buyer_id, items) => {
@@ -251,6 +325,8 @@ module.exports = {
   getShopById,
   editShop,
   createProduct,
+  editProduct,
+  deleteProduct,
   getProductsByShop,
   createOrder,
   getOrdersByBuyer,

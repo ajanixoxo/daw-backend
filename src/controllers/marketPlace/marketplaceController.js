@@ -535,7 +535,7 @@ const getShopById = asyncHandler(async (req, res) => {
 
 // Create a product (seller/admin)
 const createProduct = asyncHandler(async (req, res) => {
-  const { shop_id, name, quantity, price, category, description } = req.body;
+  const { shop_id, name, quantity, price, category, description, status, variants, productFeatures, careInstruction, returnPolicy } = req.body;
 
   if (!shop_id) {
     throw new AppError("Shop ID is required", 400);
@@ -564,6 +564,33 @@ const createProduct = asyncHandler(async (req, res) => {
     throw new AppError("Shop not found or you don't have permission to add products to this shop", 403);
   }
 
+  // Upload images to Cloudinary if provided
+  let imageUrls = [];
+  if (req.files && req.files.length > 0) {
+    const folder = "daw/products";
+    const prefix = `product_${shop_id}`;
+    const uploadPromises = req.files.map((file, index) =>
+      uploadBuffer(file.buffer, {
+        folder,
+        publicIdPrefix: `${prefix}_${Date.now()}_${index}`,
+      })
+    );
+    const results = await Promise.all(uploadPromises);
+    imageUrls = results.map((r) => r.secure_url);
+  }
+
+  // Parse variants if sent as JSON string (multipart/form-data)
+  let parsedVariants;
+  if (typeof variants === "string") {
+    try {
+      parsedVariants = JSON.parse(variants);
+    } catch {
+      parsedVariants = undefined;
+    }
+  } else {
+    parsedVariants = variants;
+  }
+
   const product = await marketplaceService.createProduct({
     sellerId: req.user._id,
     shopId: shop_id,
@@ -572,11 +599,108 @@ const createProduct = asyncHandler(async (req, res) => {
     price,
     category,
     description,
+    images: imageUrls,
+    status,
+    variants: parsedVariants,
+    productFeatures,
+    careInstruction,
+    returnPolicy,
   });
 
   res.status(201).json({ success: true, product });
 });
 
+// Edit a product (seller/admin) — partial update, only dirty fields
+const editProduct = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  const { name, quantity, price, category, description, status, variants, productFeatures, careInstruction, returnPolicy, existingImages } = req.body;
+
+  if (!productId) {
+    throw new AppError("Product ID is required", 400);
+  }
+
+  // Upload new images to Cloudinary if provided
+  let newImageUrls = [];
+  if (req.files && req.files.length > 0) {
+    const folder = "daw/products";
+    const prefix = `product_${productId}`;
+    const uploadPromises = req.files.map((file, index) =>
+      uploadBuffer(file.buffer, {
+        folder,
+        publicIdPrefix: `${prefix}_${Date.now()}_${index}`,
+      })
+    );
+    const results = await Promise.all(uploadPromises);
+    newImageUrls = results.map((r) => r.secure_url);
+  }
+
+  // Parse variants if sent as JSON string (multipart/form-data)
+  let parsedVariants;
+  if (typeof variants === "string") {
+    try {
+      parsedVariants = JSON.parse(variants);
+    } catch {
+      parsedVariants = undefined;
+    }
+  } else {
+    parsedVariants = variants;
+  }
+
+  // Parse existingImages if sent as JSON string
+  let parsedExistingImages;
+  if (typeof existingImages === "string") {
+    try {
+      parsedExistingImages = JSON.parse(existingImages);
+    } catch {
+      parsedExistingImages = undefined;
+    }
+  } else {
+    parsedExistingImages = existingImages;
+  }
+
+  // Build updates object — only include fields that were sent
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (quantity !== undefined) updates.quantity = Number(quantity);
+  if (price !== undefined) updates.price = Number(price);
+  if (category !== undefined) updates.category = category;
+  if (description !== undefined) updates.description = description;
+  if (status !== undefined) updates.status = status;
+  if (parsedVariants !== undefined) updates.variants = parsedVariants;
+  if (productFeatures !== undefined) updates.productFeatures = productFeatures;
+  if (careInstruction !== undefined) updates.careInstruction = careInstruction;
+  if (returnPolicy !== undefined) updates.returnPolicy = returnPolicy;
+
+  // Merge existing images (kept) with newly uploaded ones
+  if (parsedExistingImages !== undefined || newImageUrls.length > 0) {
+    const kept = Array.isArray(parsedExistingImages) ? parsedExistingImages : [];
+    updates.images = [...kept, ...newImageUrls];
+  }
+
+  const product = await marketplaceService.editProduct({
+    sellerId: req.user._id,
+    productId,
+    updates,
+  });
+
+  res.status(200).json({ success: true, product });
+});
+
+// Delete a product (seller/admin)
+const deleteProduct = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+
+  if (!productId) {
+    throw new AppError("Product ID is required", 400);
+  }
+
+  const result = await marketplaceService.deleteProduct({
+    sellerId: req.user._id,
+    productId,
+  });
+
+  res.status(200).json({ success: true, message: result.message });
+});
 
 const getProduct = async (req, res) => {
   try {
@@ -771,6 +895,8 @@ module.exports = {
   getShops,
   getShopById,
   createProduct,
+  editProduct,
+  deleteProduct,
   getOrdersByShop,
   getProductsByShop,
   createOrder,
