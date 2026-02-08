@@ -13,6 +13,8 @@ const router = express.Router();
 router.post("/seller-onboard", protect, restrictTo("admin", "seller", "buyer"), sellerOnboardUpload, marketplaceController.sellerOnboard);
 // Combined: guest/buyer → create user (if guest) + seller onboard + join DAW cooperative (optional auth)
 router.post("/cooperative-join-with-seller-onboard", protectOptional, sellerOnboardUpload, marketplaceController.cooperativeJoinWithSellerOnboard);
+// Guest seller onboard: guest/buyer → create user (if guest) + seller onboard (shop + docs) (optional auth)
+router.post("/guest-seller-onboard", protectOptional, sellerOnboardUpload, marketplaceController.guestSellerOnboard);
 router.get("/seller-documents/me", protect, marketplaceController.getMySellerDocuments);
 
 // Shops

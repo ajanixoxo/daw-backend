@@ -24,6 +24,12 @@ const CooperativeSchema = new mongoose.Schema(
 
     members: [{ type: mongoose.Schema.Types.ObjectId, ref: "Member" }],
 
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected", "suspended"],
+      default: "pending"
+    },
+
     isActive: { type: Boolean, default: true }
   },
   { timestamps: true }
