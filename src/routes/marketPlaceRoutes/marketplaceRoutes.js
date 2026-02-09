@@ -5,7 +5,8 @@ const {
   restrictTo,
 } = require('@middlewares/authMiddleware.js');
 const marketplaceController = require('@controllers/marketPlace/marketplaceController.js');
-const { sellerOnboardUpload } = require('@middlewares/uploadMiddleware.js');
+const categoryController = require('@controllers/marketPlace/categoryController.js');
+const { sellerOnboardUpload, productImagesUpload, shopEditUpload } = require('@middlewares/uploadMiddleware.js');
 
 const router = express.Router();
 
@@ -20,11 +21,18 @@ router.get("/seller-documents/me", protect, marketplaceController.getMySellerDoc
 // Shops
 router.post("/create/shops", protect, restrictTo("admin", "seller", "buyer"), marketplaceController.createShop);
 router.get("/get/shops", marketplaceController.getShops);
+router.get("/my-shop", protect, restrictTo("seller"), marketplaceController.getMyShop);
 router.get("/get/shops/:id", marketplaceController.getShopById);
-router.put("/edit/shops/:id", protect, restrictTo("seller"), marketplaceController.editShops);
+router.put("/edit/shops/:id", protect, restrictTo("seller"), shopEditUpload, marketplaceController.editShops);
+
+// Categories
+router.post("/categories", protect, restrictTo("admin", "seller"), categoryController.createCategory);
+router.get("/categories/shop/:shop_id", protect, restrictTo("admin", "seller"), categoryController.getCategoriesByShop);
 
 // Products
-router.post("/add/products", protect, restrictTo("admin", "seller", "buyer"), marketplaceController.createProduct);
+router.post("/add/products", protect, restrictTo("admin", "seller", "buyer"), productImagesUpload, marketplaceController.createProduct);
+router.patch("/products/:productId", protect, restrictTo("admin", "seller"), productImagesUpload, marketplaceController.editProduct);
+router.delete("/products/:productId", protect, restrictTo("admin", "seller"), marketplaceController.deleteProduct);
 router.get("/get/products/shop/:shop_id", marketplaceController.getProductsByShop);
 router.get('/get/all/products', marketplaceController.getAllProduct);
 router.get('/get/products/:productId', marketplaceController.getProduct);

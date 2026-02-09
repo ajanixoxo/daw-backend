@@ -43,6 +43,12 @@ const createShop = asyncHandler(async (req, res) => {
     await foundUser.save();
   }
 
+  // Auto-generate store_url from shop name
+  const store_url = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') + '-' + Date.now();
+
   const shopData = {
     owner_id,
     cooperative_id: cooperative_id || null,
@@ -128,10 +134,16 @@ const sellerOnboard = asyncHandler(async (req, res) => {
     banner_url = r.secure_url;
   }
 
+  const store_url = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') + '-' + Date.now();
+
   const shopData = {
     owner_id,
     cooperative_id: null,
     name,
+    store_url,
     description,
     category,
     contact_number: contactNumber,
@@ -316,10 +328,16 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
     banner_url = r.secure_url;
   }
 
+  const coopStoreUrl = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') + '-' + Date.now();
+
   const shopData = {
     owner_id: userId,
     cooperative_id: cooperativeId,
     name,
+    store_url: coopStoreUrl,
     description,
     category,
     contact_number: contactNumber,
@@ -475,10 +493,16 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
     banner_url = r.secure_url;
   }
 
+  const guestStoreUrl = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') + '-' + Date.now();
+
   const shopData = {
     owner_id: userId,
     cooperative_id: null,
     name,
+    store_url: guestStoreUrl,
     description,
     category,
     contact_number: contactNumber,
@@ -535,7 +559,7 @@ const getShopById = asyncHandler(async (req, res) => {
 
 // Create a product (seller/admin)
 const createProduct = asyncHandler(async (req, res) => {
-  const { shop_id, name, quantity, price } = req.body;
+  const { shop_id, name, quantity, price, category, description, status, variants, productFeatures, careInstruction, returnPolicy } = req.body;
 
   if (!shop_id) {
     throw new AppError("Shop ID is required", 400);
@@ -564,17 +588,143 @@ const createProduct = asyncHandler(async (req, res) => {
     throw new AppError("Shop not found or you don't have permission to add products to this shop", 403);
   }
 
+  // Upload images to Cloudinary if provided
+  let imageUrls = [];
+  if (req.files && req.files.length > 0) {
+    const folder = "daw/products";
+    const prefix = `product_${shop_id}`;
+    const uploadPromises = req.files.map((file, index) =>
+      uploadBuffer(file.buffer, {
+        folder,
+        publicIdPrefix: `${prefix}_${Date.now()}_${index}`,
+      })
+    );
+    const results = await Promise.all(uploadPromises);
+    imageUrls = results.map((r) => r.secure_url);
+  }
+
+  // Parse variants if sent as JSON string (multipart/form-data)
+  let parsedVariants;
+  if (typeof variants === "string") {
+    try {
+      parsedVariants = JSON.parse(variants);
+    } catch {
+      parsedVariants = undefined;
+    }
+  } else {
+    parsedVariants = variants;
+  }
+
   const product = await marketplaceService.createProduct({
     sellerId: req.user._id,
     shopId: shop_id,
     name,
     quantity,
-    price
+    price,
+    category,
+    description,
+    images: imageUrls,
+    status,
+    variants: parsedVariants,
+    productFeatures,
+    careInstruction,
+    returnPolicy,
   });
 
   res.status(201).json({ success: true, product });
 });
 
+// Edit a product (seller/admin) — partial update, only dirty fields
+const editProduct = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+  const { name, quantity, price, category, description, status, variants, productFeatures, careInstruction, returnPolicy, existingImages } = req.body;
+
+  if (!productId) {
+    throw new AppError("Product ID is required", 400);
+  }
+
+  // Upload new images to Cloudinary if provided
+  let newImageUrls = [];
+  if (req.files && req.files.length > 0) {
+    const folder = "daw/products";
+    const prefix = `product_${productId}`;
+    const uploadPromises = req.files.map((file, index) =>
+      uploadBuffer(file.buffer, {
+        folder,
+        publicIdPrefix: `${prefix}_${Date.now()}_${index}`,
+      })
+    );
+    const results = await Promise.all(uploadPromises);
+    newImageUrls = results.map((r) => r.secure_url);
+  }
+
+  // Parse variants if sent as JSON string (multipart/form-data)
+  let parsedVariants;
+  if (typeof variants === "string") {
+    try {
+      parsedVariants = JSON.parse(variants);
+    } catch {
+      parsedVariants = undefined;
+    }
+  } else {
+    parsedVariants = variants;
+  }
+
+  // Parse existingImages if sent as JSON string
+  let parsedExistingImages;
+  if (typeof existingImages === "string") {
+    try {
+      parsedExistingImages = JSON.parse(existingImages);
+    } catch {
+      parsedExistingImages = undefined;
+    }
+  } else {
+    parsedExistingImages = existingImages;
+  }
+
+  // Build updates object — only include fields that were sent
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (quantity !== undefined) updates.quantity = Number(quantity);
+  if (price !== undefined) updates.price = Number(price);
+  if (category !== undefined) updates.category = category;
+  if (description !== undefined) updates.description = description;
+  if (status !== undefined) updates.status = status;
+  if (parsedVariants !== undefined) updates.variants = parsedVariants;
+  if (productFeatures !== undefined) updates.productFeatures = productFeatures;
+  if (careInstruction !== undefined) updates.careInstruction = careInstruction;
+  if (returnPolicy !== undefined) updates.returnPolicy = returnPolicy;
+
+  // Merge existing images (kept) with newly uploaded ones
+  if (parsedExistingImages !== undefined || newImageUrls.length > 0) {
+    const kept = Array.isArray(parsedExistingImages) ? parsedExistingImages : [];
+    updates.images = [...kept, ...newImageUrls];
+  }
+
+  const product = await marketplaceService.editProduct({
+    sellerId: req.user._id,
+    productId,
+    updates,
+  });
+
+  res.status(200).json({ success: true, product });
+});
+
+// Delete a product (seller/admin)
+const deleteProduct = asyncHandler(async (req, res) => {
+  const { productId } = req.params;
+
+  if (!productId) {
+    throw new AppError("Product ID is required", 400);
+  }
+
+  const result = await marketplaceService.deleteProduct({
+    sellerId: req.user._id,
+    productId,
+  });
+
+  res.status(200).json({ success: true, message: result.message });
+});
 
 const getProduct = async (req, res) => {
   try {
@@ -743,14 +893,57 @@ const getSellerDetails = asyncHandler(async (req, res) => {
 });
 
 
+// Get the current user's shop
+const getMyShop = asyncHandler(async (req, res) => {
+  if (!req.user || !req.user._id) {
+    throw new AppError('User not authenticated', 401);
+  }
+
+  const shop = await marketplaceService.getShopByOwnerId(req.user._id);
+  if (!shop) {
+    return res.status(404).json({ success: false, message: 'Shop not found. Please create a shop first.' });
+  }
+
+  // Also get product count for this shop
+  const Product = require("@models/marketPlace/productModel.js");
+  const productCount = await Product.countDocuments({ shop_id: shop._id });
+
+  res.status(200).json({
+    success: true,
+    shop,
+    productCount,
+  });
+});
+
 const editShops = asyncHandler(async (req, res) => {
   const { id: shopId } = req.params;
   const ownerId = req.user._id;
+  const files = req.files || {};
+
+  const data = { ...req.body };
+
+  // Handle logo upload
+  const shopLogo = Array.isArray(files.shopLogo) ? files.shopLogo[0] : files.shopLogo;
+  if (shopLogo && shopLogo.buffer) {
+    const folderShop = 'daw/shops';
+    const prefix = `seller_${ownerId.toString()}`;
+    const r = await uploadBuffer(shopLogo.buffer, { folder: folderShop, publicIdPrefix: `${prefix}_logo` });
+    data.logo_url = r.secure_url;
+  }
+
+  // Handle banner upload
+  const shopBanner = Array.isArray(files.shopBanner) ? files.shopBanner[0] : files.shopBanner;
+  if (shopBanner && shopBanner.buffer) {
+    const folderShop = 'daw/shops';
+    const prefix = `seller_${ownerId.toString()}`;
+    const r = await uploadBuffer(shopBanner.buffer, { folder: folderShop, publicIdPrefix: `${prefix}_banner` });
+    data.banner_url = r.secure_url;
+  }
 
   const updatedShop = await marketplaceService.editShop({
     shopId,
     ownerId,
-    data: req.body,
+    data,
   });
 
   res.status(200).json({
@@ -766,9 +959,12 @@ module.exports = {
   guestSellerOnboard,
   cooperativeJoinWithSellerOnboard,
   getMySellerDocuments,
+  getMyShop,
   getShops,
   getShopById,
   createProduct,
+  editProduct,
+  deleteProduct,
   getOrdersByShop,
   getProductsByShop,
   createOrder,
