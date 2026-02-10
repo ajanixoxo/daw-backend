@@ -9,7 +9,8 @@ const { seedDAWCooperative } = require('./src/scripts/seedDAWCooperative.js');
 const marketPlaceRoutes = require('@routes/marketPlaceRoutes/marketplaceRoutes.js')
 const extraMarketPlaceRoutes = require('@routes/marketPlaceRoutes/marketplaceExtraRoutes.js');
 const AppError = require('@utils/Error/AppError.js');
-const cooperativeRoutes = require('@routes/cooperativeRoutes/cooperativeRoutes.js');
+const cooperativeRoutes = require("./src/routes/cooperativeRoutes/cooperativeRoutes.js");
+const cooperativeDashboardRoutes = require("./src/routes/cooperativeRoutes/cooperativeDashboard.routes.js");
 const tierRoutes = require('@routes/tierRoutes/tierRoutes.js');
 const memberRoutes = require('@routes/memberRoutes/memberRoutes.js');
 const contributionRoutes = require('@routes/contributionRoutes/contributionRoutes.js');
@@ -72,6 +73,7 @@ app.use('/auth', authRoutes);
 
 app.use('/api/users', userRoutes);
 app.use('/api/cooperatives', cooperativeRoutes);
+app.use('/api/cooperatives', cooperativeDashboardRoutes);
 app.use('/api/tiers', tierRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/contributions', contributionRoutes);
