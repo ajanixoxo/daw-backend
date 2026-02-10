@@ -2,6 +2,7 @@ const Shop = require("@models/marketPlace/shopModel.js");
 const Product = require("@models/marketPlace/productModel.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const OrderItem = require("@models/marketPlace/orderItemModel.js");
+const ShopView = require("@models/marketPlace/shopViewModel.js");
 const AppError = require("@utils/Error/AppError.js");
 const mongoose = require("mongoose");
 
@@ -323,6 +324,28 @@ const getOrdersByShopId = async (shop_id) => {
   return orders;
 };
 
+// SHOP VIEWS
+const recordShopView = async (shopId, viewerId, ipAddress) => {
+  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+  // For logged-in users: deduplicate by user ID (ignore IP — it can vary)
+  // For guests: deduplicate by IP address
+  const filter = viewerId
+    ? { shop_id: shopId, viewer_id: viewerId, view_date: today }
+    : { shop_id: shopId, viewer_id: null, ip_address: ipAddress, view_date: today };
+
+  // Atomic upsert — even simultaneous requests only create one document
+  return ShopView.findOneAndUpdate(
+    filter,
+    { $setOnInsert: { shop_id: shopId, viewer_id: viewerId || null, ip_address: ipAddress, view_date: today } },
+    { upsert: true, new: true }
+  );
+};
+
+const getShopViewCount = async (shopId) => {
+  return ShopView.countDocuments({ shop_id: shopId });
+};
+
 module.exports = {
   createShop,
   getShops,
@@ -339,4 +362,6 @@ module.exports = {
   getAllProduct,
   getProductById,
   getOrdersByShopId,
+  recordShopView,
+  getShopViewCount,
 };
