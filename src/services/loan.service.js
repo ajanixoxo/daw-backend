@@ -38,6 +38,7 @@ module.exports = {
       subscriptionTierId: tier._id,
       amount,
       interestRate: settings.interestRate || 0,
+      purpose: purpose || "",
       durationMonths,
       status: "pending",
       eligibilityReport: {

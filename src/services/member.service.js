@@ -90,7 +90,11 @@ module.exports = {
   },
 
   async getMembers(cooperativeId) {
-    return Member.find({ cooperativeId }).populate("subscriptionTierId userId").lean();
+    return Member.find({ cooperativeId })
+      .populate("userId", "firstName lastName email phone roles status")
+      .populate("subscriptionTierId", "name monthlyContribution")
+      .sort({ createdAt: -1 })
+      .lean();
   },
 
   async updateStatus(id, status) {
