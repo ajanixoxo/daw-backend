@@ -13,11 +13,11 @@ const Contribution = require("../models/contributionModel/contribution.model.js"
 module.exports = {
   async applyForLoan({ memberId, amount, durationMonths, purpose }) {
     const member = await Member.findById(memberId).populate("subscriptionTierId").lean();
-    if (!member) throw new Error("Member not found");
-    if (member.status !== "active") throw new Error("Member must be active to apply for loan");
+    if (!member) {throw new Error("Member not found");}
+    if (member.status !== "active") {throw new Error("Member must be active to apply for loan");}
 
     const tier = await SubscriptionTier.findById(member.subscriptionTierId);
-    if (!tier) throw new Error("Subscription tier not found");
+    if (!tier) {throw new Error("Subscription tier not found");}
 
     const settings = tier.loanSettings || {};
     if (amount > (settings.maxAmount || 0)) {
@@ -29,7 +29,7 @@ module.exports = {
     if (minPaidMonths > 0) {
       // count paid contributions
       const paidCount = await Contribution.countDocuments({ memberId, status: "paid" });
-      if (paidCount < minPaidMonths) throw new Error("Insufficient paid contribution history for loan eligibility");
+      if (paidCount < minPaidMonths) {throw new Error("Insufficient paid contribution history for loan eligibility");}
     }
 
     const loan = await Loan.create({
@@ -38,6 +38,7 @@ module.exports = {
       subscriptionTierId: tier._id,
       amount,
       interestRate: settings.interestRate || 0,
+      purpose: purpose || "",
       durationMonths,
       status: "pending",
       eligibilityReport: {
@@ -50,7 +51,7 @@ module.exports = {
   async approve(loanId, { approverId }) {
     // approve flow; real systems would log approver, change balances, etc.
     const loan = await Loan.findByIdAndUpdate(loanId, { status: "approved" }, { new: true });
-    if (!loan) throw new Error("Loan not found");
+    if (!loan) {throw new Error("Loan not found");}
     return loan;
   },
 

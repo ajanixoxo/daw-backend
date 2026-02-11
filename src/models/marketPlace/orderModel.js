@@ -4,34 +4,34 @@ const orderSchema = new mongoose.Schema({
   buyer_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true,
+    required: true
   },
   shop_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Shop",
-    required: true,
+    required: true
   },
   logistics_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "LogisticsProvider",
+    ref: "LogisticsProvider"
   },
-  total_amount: { type: Number, required: true, min: [0.01, 'Total amount must be greater than 0'] },
+  total_amount: { type: Number, required: true, min: [0.01, "Total amount must be greater than 0"] },
   discount: { type: Number, default: 0 },
   escrow_status: {
     type: String,
     enum: ["pending", "held", "released"],
-    default: "pending",
+    default: "pending"
   },
   payment_status: {
     type: String,
     enum: ["unpaid", "paid", "refunded"],
-    default: "unpaid",
+    default: "unpaid"
   },
   status: {
     type: String,
     enum: ["pending", "processing", "in_transit", "delivered", "disputed"],
-    default: "pending",
-  },
+    default: "pending"
+  }
 }, { timestamps: true });
 
 const Order = mongoose.model("Order", orderSchema);

@@ -7,14 +7,14 @@ const globalErrorHandler = (err, req, res, next) => {
     return res.status(err.statusCode).json({
       success: false,
       status: err.status,
-      message: err.message,
+      message: err.message
     });
   }
 
   return res.status(500).json({
     success: false,
     status: "error",
-    message: "Something went wrong",
+    message: "Something went wrong"
   });
 };
 

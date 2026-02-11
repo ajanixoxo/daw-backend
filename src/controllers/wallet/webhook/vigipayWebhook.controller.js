@@ -4,7 +4,9 @@ const verifyVigipaySignature = require("@utils/vigipayClient/verifyWebhook.js");
 
 exports.vigipayWebhook = async (req, res) => {
   try {
-     console.log("listening webhook")
+    console.log("Vigipay webhook received");
+
+    // verify signature
     const isValid = verifyVigipaySignature(req);
     if (!isValid) {
       return res.status(401).json({ message: "Invalid signature" });
@@ -12,8 +14,8 @@ exports.vigipayWebhook = async (req, res) => {
 
     const { Code, Succeeded, Data } = req.body;
 
-    if (!Succeeded || Code !== "00") {
-      return res.status(200).json({ message: "Ignored non-success event" });
+    if (!Data) {
+      return res.status(400).json({ message: "Invalid webhook payload" });
     }
 
     const {
@@ -23,30 +25,46 @@ exports.vigipayWebhook = async (req, res) => {
       Status,
       TransactionDate,
       BeneficiaryAccount,
-      CustomerId,
+      CustomerId
     } = Data;
 
-    let ledger = await WalletLedger.findOne({ reference: Reference });
+    // idempotency check (reference OR merchantRef)
+    const ledger = await WalletLedger.findOne({
+      $or: [
+        { reference: Reference },
+        { merchantRef: MerchantRef }
+      ]
+    });
 
-
-    let user = null;
-    if (!ledger) {
-      user = await User.findOne({ walletId: CustomerId });
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
+    // if already SUCCESS → ignore replay
+    if (ledger && ledger.status === "SUCCESS") {
+      return res.status(200).json({ message: "Already processed" });
     }
 
+    const finalStatus =
+      Succeeded && Code === "00" && Status === "Successful"
+        ? "SUCCESS"
+        : "FAILED";
+
     if (ledger) {
-      ledger.status = Status === "Successful" ? "SUCCESS" : "FAILED";
+      // update existing ledger
+      ledger.status = finalStatus;
       ledger.transactionDate = new Date(TransactionDate);
       ledger.beneficiaryAccount = BeneficiaryAccount;
       ledger.rawWebhookPayload = req.body;
+
       await ledger.save();
 
       return res.status(200).json({ message: "Ledger updated successfully" });
     }
 
+    // if ledger not found, try linking by CustomerId
+    const user = await User.findOne({ walletId: CustomerId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // create ledger from webhook
     await WalletLedger.create({
       userId: user._id,
       walletId: user.walletId,
@@ -54,16 +72,20 @@ exports.vigipayWebhook = async (req, res) => {
       merchantRef: MerchantRef,
       type: "DEBIT",
       amount: Amount,
-      status: Status === "Successful" ? "SUCCESS" : "FAILED",
+      status: finalStatus,
       beneficiaryAccount: BeneficiaryAccount,
       transactionDate: new Date(TransactionDate),
-      rawWebhookPayload: req.body,
+      rawWebhookPayload: req.body
     });
 
-    return res.status(200).json({ message: "Ledger created from webhook" });
+    return res.status(200).json({
+      message: "Ledger created from webhook"
+    });
 
   } catch (error) {
-    console.error("Webhook Error:", error);
-    return res.status(500).json({ message: "Webhook processing failed" });
+    console.error("❌ Webhook Error:", error);
+    return res.status(500).json({
+      message: "Webhook processing failed"
+    });
   }
 };

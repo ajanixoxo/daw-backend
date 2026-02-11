@@ -12,7 +12,7 @@ module.exports = {
   async createContribution({ memberId, cooperativeId, amount, month }) {
     // ensure record uniqueness for member-month if desired
     const exists = await Contribution.findOne({ memberId, month });
-    if (exists) throw new Error("Contribution for this member and month already exists");
+    if (exists) {throw new Error("Contribution for this member and month already exists");}
 
     return Contribution.create({ memberId, cooperativeId, amount, month });
   },
@@ -27,7 +27,7 @@ module.exports = {
       { status: "paid", transactionId, paidAt },
       { new: true }
     );
-    if (!c) throw new Error("Contribution not found");
+    if (!c) {throw new Error("Contribution not found");}
 
     // append to member.paymentHistory
     await Member.findByIdAndUpdate(c.memberId, {
@@ -52,7 +52,7 @@ module.exports = {
     for (const m of activeMembers) {
       // skip if existing contribution present
       const exists = await Contribution.findOne({ memberId: m._id, month: monthName });
-      if (exists) continue;
+      if (exists) {continue;}
       const c = await Contribution.create({
         memberId: m._id,
         cooperativeId: m.cooperativeId,

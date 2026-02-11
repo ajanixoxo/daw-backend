@@ -12,12 +12,12 @@ const logger = winston.createLogger({
     new winston.transports.Console(),
     new winston.transports.File({
       filename: "logs/app.log",
-      level: "error",
+      level: "error"
     }),
     new winston.transports.File({
-      filename: "logs/combined.log",
-    }),
-  ],
+      filename: "logs/combined.log"
+    })
+  ]
 });
 
 module.exports = logger;

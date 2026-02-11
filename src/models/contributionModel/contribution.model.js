@@ -14,6 +14,11 @@ const ContributionSchema = new mongoose.Schema(
       required: true
     },
 
+    contributionTypeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ContributionType"
+    },
+
     amount: { type: Number, required: true },
 
     month: { type: String, required: true }, // e.g., "January 2025"

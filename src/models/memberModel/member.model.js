@@ -49,5 +49,8 @@ const MemberSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// One membership per user per cooperative (business rule). Prevents duplicate joins.
+MemberSchema.index({ userId: 1, cooperativeId: 1 }, { unique: true });
+
 const Member = mongoose.model("Member", MemberSchema);
 module.exports = Member;

@@ -17,12 +17,12 @@ const UserSchema = new mongoose.Schema(
     firstName: {
       type: String,
       required: [true, "First name is required"],
-      trim: true,
+      trim: true
     },
 
     lastName: {
       type: String,
-      trim: true,
+      trim: true
     },
 
     email: {
@@ -31,54 +31,61 @@ const UserSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      match: [/.+\@.+\..+/, "Please fill a valid email address"],
+      match: [/.+\@.+\..+/, "Please fill a valid email address"]
     },
 
     phone: {
       type: String,
       required: [true, "phone number is required"],
       unique: true,
-      trim: true,
+      trim: true
     },
 
     password: {
       type: String,
       required: true,
       minlength: 6,
-      select: false,
+      select: false
     },
 
     otp: {
       type: String,
-      select: false,
+      select: false
+    },
+
+    // Used across auth controllers (register/login/verify/resend). Keep this field name
+    // to match current controller usage (otpExpiry). See: src/controllers/Authentication/auth.js
+    otpExpiry: {
+      type: Date,
+      select: false
     },
 
     otpExpires: {
-      type: Date,
+      type: Date
     },
 
     isVerified: {
       type: Boolean,
-      default: false,
+      default: false
     },
 
     kyc_status: {
       type: String,
       enum: ["pending", "verified", "rejected"],
-      default: "pending",
+      default: "pending"
     },
 
     kycVerified: {
       type: Boolean,
-      default: false,
+      default: false
     },
 
     kycVerifiedAt: {
-      type: Date,
+      type: Date
     },
 
     kycData: {
-      type: mongoose.Schema.Types.Mixed,
+      type: mongoose.Schema.Types.Mixed
     },
 
     // role: {
@@ -98,80 +105,105 @@ const UserSchema = new mongoose.Schema(
         "cooperative",
         "member",
         "logistics_provider",
+        "cooperative_admin"
       ],
-      required: true,
+      required: true
     },
 
     status: {
       type: String,
-      enum: ["active", "suspended"],
+      enum: ["active", "suspended", "invited"],
       default: "active",
+    },
+
+    invitationToken: {
+      type: String,
+      select: false,
+    },
+
+    invitationExpires: {
+      type: Date,
+      select: false,
+    },
+
+    invitationToken: {
+      type: String,
+      select: false,
+    },
+
+    invitationExpires: {
+      type: Date,
+      select: false,
     },
 
     refreshToken: {
       type: String,
-      select: false,
+      select: false
     },
 
     verificationToken: {
-      type: String,
+      type: String
     },
 
     createdAt: {
       type: Date,
-      default: Date.now,
+      default: Date.now
     },
 
     updatedAt: {
       type: Date,
-      default: Date.now,
+      default: Date.now
     },
     cart: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Cart",
+      ref: "Cart"
     },
     shop: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Shop",
+      ref: "Shop"
     },
     walletId: {
-      type: String,
+      type: String
     },
     accountId: {
-      type: String,
+      type: String
     },
     accountNo: {
-      type: String,
+      type: String
     },
     pin: {
       type: String,
-      select: false,
+      select: false
     },
     accountName: {
-      type: String,
+      type: String
     },
     bankName: {
-      type: String,
+      type: String
     },
     bankCode: {
-      type: String,
+      type: String
     },
-    aacount_Balance: {
-      type: Number,
+    account_Balance: {
+      type: Number
     },
     wallet_balance: {
+      type: Number
+    },
+    pending_amount: {
       type: Number,
+      default: 0
     }
-    
+
   },
   { timestamps: true }
 );
 
 UserSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+  if (!this.isModified("password")) {return next();}
   const salt = await bcrypt.genSalt(saltRounds);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
+  return next();
 });
 
 UserSchema.methods.comparePassword = async function (Enteredpassword) {
@@ -186,16 +218,16 @@ UserSchema.methods.generateToken = async function () {
       email: this.email,
       roles: this.roles,
       status: this.status,
-      shop: this.shop,
+      shop: this.shop
     },
     jwtsecret,
     {
-      expiresIn: "1d",
+      expiresIn: "1d"
     }
   );
 
   const refreshToken = jwt.sign({ _id: this._id }, jwtsecret, {
-    expiresIn: "15d",
+    expiresIn: "15d"
   });
 
   return { accessToken, refreshToken };

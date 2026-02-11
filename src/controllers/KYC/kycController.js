@@ -1,8 +1,8 @@
-const user = require('@models/userModel/user.js');
-const asyncHandler = require('express-async-handler');
-const AppError = require('@utils/Error/AppError.js');
-const axios = require('axios');
-const mongoose = require('mongoose');
+const user = require("@models/userModel/user.js");
+const asyncHandler = require("express-async-handler");
+const AppError = require("@utils/Error/AppError.js");
+const axios = require("axios");
+const mongoose = require("mongoose");
 
 /**
  * Verify NIN with YouVerify
@@ -14,17 +14,17 @@ const verifyNIN = asyncHandler(async (req, res) => {
 
     // Validate required fields
     if (!nin) {
-      throw new AppError('nin is required', 400);
+      throw new AppError("nin is required", 400);
     }
 
     // userId is required in the request body
     const targetUserId = userId;
     
-    console.log('KYC Verification - userId from body:', userId);
-    console.log('KYC Verification - targetUserId:', targetUserId);
+    console.log("KYC Verification - userId from body:", userId);
+    console.log("KYC Verification - targetUserId:", targetUserId);
     
     if (!targetUserId) {
-      throw new AppError('userId is required', 400);
+      throw new AppError("userId is required", 400);
     }
 
     // Validate MongoDB ObjectId format
@@ -39,19 +39,19 @@ const verifyNIN = asyncHandler(async (req, res) => {
       throw new AppError(`User not found with ID: ${targetUserId}`, 404);
     }
     
-    console.log('KYC Verification - User found:', User._id, User.email);
+    console.log("KYC Verification - User found:", User._id, User.email);
 
     // Prepare payload for YVOS API
     const payload = {
       id: nin,
       isSubjectConsent: true,
-      premiumNin: false,
+      premiumNin: false
     };
 
     // Add optional fields if provided
-    if (firstName) payload.firstName = firstName;
-    if (lastName) payload.lastName = lastName;
-    if (dateOfBirth) payload.dateOfBirth = dateOfBirth;
+    if (firstName) {payload.firstName = firstName;}
+    if (lastName) {payload.lastName = lastName;}
+    if (dateOfBirth) {payload.dateOfBirth = dateOfBirth;}
     if (selfieImage) {
       payload.selfie = {
         image: selfieImage
@@ -59,11 +59,11 @@ const verifyNIN = asyncHandler(async (req, res) => {
     }
 
     // Call YVOS API
-    const baseUrl = process.env.BASE_URL || 'https://api.sandbox.youverify.co';
+    const baseUrl = process.env.BASE_URL || "https://api.sandbox.youverify.co";
     const apiKey = process.env.YVOS_API_KEY;
 
     if (!apiKey) {
-      throw new AppError('YVOS_API_KEY is not configured', 500);
+      throw new AppError("YVOS_API_KEY is not configured", 500);
     }
 
     const response = await axios.post(
@@ -72,7 +72,7 @@ const verifyNIN = asyncHandler(async (req, res) => {
       {
         headers: {
           token: apiKey,
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json"
         }
       }
     );
@@ -85,38 +85,38 @@ const verifyNIN = asyncHandler(async (req, res) => {
     const allValidationPassed = data.allValidationPassed === true;
 
     // Update user based on response
-    if (isSuccess && status === 'found' && allValidationPassed) {
+    if (isSuccess && status === "found" && allValidationPassed) {
       User.kycVerified = true;
       User.kycVerifiedAt = new Date();
       User.kycData = data;
       
       // Also update kyc_status for backward compatibility
-      if (User.kyc_status !== 'verified') {
-        User.kyc_status = 'verified';
+      if (User.kyc_status !== "verified") {
+        User.kyc_status = "verified";
       }
     } else {
       User.kycVerified = false;
       User.kycData = data;
       
       // Update kyc_status based on status
-      if (status === 'found' && !allValidationPassed) {
-        User.kyc_status = 'rejected';
+      if (status === "found" && !allValidationPassed) {
+        User.kyc_status = "rejected";
       } else {
-        User.kyc_status = 'pending';
+        User.kyc_status = "pending";
       }
     }
 
     await User.save();
 
     // Return response
-    res.status(200).json({
+    return res.status(200).json({
       success: isSuccess,
       kycVerified: User.kycVerified,
       data: responseData
     });
 
   } catch (error) {
-    console.error('Error verifying NIN:', error.message);
+    console.error("Error verifying NIN:", error.message);
     
     // Handle axios errors
     if (error.response) {
@@ -133,7 +133,7 @@ const verifyNIN = asyncHandler(async (req, res) => {
       throw error;
     }
     
-    throw new AppError(error.message || 'Error verifying NIN', error.statusCode || 500);
+    throw new AppError(error.message || "Error verifying NIN", error.statusCode || 500);
   }
 });
 
