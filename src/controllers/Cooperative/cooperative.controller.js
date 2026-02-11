@@ -19,7 +19,7 @@ const getDAWCooperative = async (req, res) => {
     }
     const tiers = await SubscriptionTier.find({
       cooperativeId: cooperative._id,
-      isActive: true,
+      isActive: true
     })
       .select("_id name monthlyContribution")
       .sort({ name: 1 })
@@ -29,9 +29,9 @@ const getDAWCooperative = async (req, res) => {
         _id: cooperative._id,
         name: cooperative.name,
         description: cooperative.description,
-        isActive: cooperative.isActive,
+        isActive: cooperative.isActive
       },
-      tiers,
+      tiers
     });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -50,7 +50,7 @@ const createCooperative = async (req, res) => {
 const getCooperative = async (req, res) => {
   try {
     const cooperative = await CoopService.getCooperative(req.params.id);
-    if (!cooperative) return res.status(404).json({ error: "Not found" });
+    if (!cooperative) {return res.status(404).json({ error: "Not found" });}
     return res.json(cooperative);
   } catch (err) {
     return res.status(400).json({ error: err.message });

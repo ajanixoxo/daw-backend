@@ -6,57 +6,59 @@ const walletLedgerSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true,
+      index: true
     },
 
     walletId: {
       type: String,
       required: true,
-      index: true,
+      index: true
     },
 
     reference: {
       type: String,
       required: true,
       unique: true, // 🔐 idempotency
+      index: true
     },
 
     merchantRef: {
       type: String,
+      index: true
     },
 
     type: {
       type: String,
       enum: ["CREDIT", "DEBIT"],
-      required: true,
+      required: true
     },
 
     amount: {
       type: Number,
-      required: true,
+      required: true
     },
 
     status: {
       type: String,
       enum: ["PENDING", "SUCCESS", "FAILED"],
-      default: "PENDING",
+      default: "PENDING"
     },
 
     channel: {
-      type: String, 
+      type: String 
     },
 
     beneficiaryAccount: {
-      type: String,
+      type: String
     },
 
     rawWebhookPayload: {
-      type: Object,
+      type: Object
     },
 
     transactionDate: {
-      type: Date,
-    },
+      type: Date
+    }
   },
   { timestamps: true }
 );

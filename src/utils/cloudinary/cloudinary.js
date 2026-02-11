@@ -6,7 +6,7 @@ const AppError = require("@utils/Error/AppError.js");
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
 /**
@@ -20,7 +20,7 @@ function uploadBuffer(buffer, options = {}) {
 
   return new Promise((resolve, reject) => {
     const uploadOptions = { folder, resource_type };
-    if (publicIdPrefix) uploadOptions.public_id = publicIdPrefix;
+    if (publicIdPrefix) {uploadOptions.public_id = publicIdPrefix;}
 
     const stream = cloudinary.uploader.upload_stream(
       uploadOptions,
@@ -42,5 +42,5 @@ function uploadBuffer(buffer, options = {}) {
 
 module.exports = {
   cloudinary,
-  uploadBuffer,
+  uploadBuffer
 };

@@ -2,7 +2,7 @@ const crypto = require("crypto");
 
 module.exports = function verifyVigipaySignature(req) {
   const signature = req.headers["vigipay-signature"];
-  if (!signature) return false;
+  if (!signature) {return false;}
 
   const payload = req.rawBody; 
   const integrationKey = process.env.VIGIPAY_INTEGRATION_KEY;

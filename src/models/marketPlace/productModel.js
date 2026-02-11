@@ -4,7 +4,7 @@ const productSchema = new mongoose.Schema({
   shop_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Shop",
-    required: true,
+    required: true
   },
   name: { type: String, required: true, trim: true },
   description: String,
@@ -12,7 +12,7 @@ const productSchema = new mongoose.Schema({
   quantity: { type: Number, required: true },
   price: { type: Number, required: true },
   images: [String],
-  status: { type: String, enum: ["available", "out_of_stock"], default: "available" },
+  status: { type: String, enum: ["available", "out_of_stock"], default: "available" }
 }, { timestamps: true });
 
 const Product = mongoose.model("Product", productSchema);

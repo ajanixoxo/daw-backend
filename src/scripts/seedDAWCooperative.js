@@ -50,7 +50,7 @@ async function seedDAWCooperative() {
         phone,
         password,
         roles: ["admin"],
-        isVerified: false,
+        isVerified: false
       });
       console.log("[seed] Created DAW cooperative admin from env");
     }
@@ -60,26 +60,26 @@ async function seedDAWCooperative() {
       description: "Digital African Women Cooperative",
       adminId: admin._id,
       subscriptionTiers: [],
-      isActive: true,
+      isActive: true
     });
 
     const tier1 = await SubscriptionTier.create({
       cooperativeId: coop._id,
       name: "Tier 1",
       monthlyContribution: 25000,
-      isActive: true,
+      isActive: true
     });
     const tier2 = await SubscriptionTier.create({
       cooperativeId: coop._id,
       name: "Tier 2",
       monthlyContribution: 30000,
-      isActive: true,
+      isActive: true
     });
     const tier3 = await SubscriptionTier.create({
       cooperativeId: coop._id,
       name: "Tier 3",
       monthlyContribution: 50000,
-      isActive: true,
+      isActive: true
     });
 
     coop.subscriptionTiers = [tier1._id, tier2._id, tier3._id];

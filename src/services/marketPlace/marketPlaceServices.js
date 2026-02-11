@@ -17,7 +17,7 @@ const getShops = async () => await Shop.find();
 const getShopById = async (id) =>{ 
   await Shop.findById(id);
 
-}
+};
 
 const editShop = async ({ shopId, ownerId, data }) => {
   const allowedFields = [
@@ -26,7 +26,7 @@ const editShop = async ({ shopId, ownerId, data }) => {
     "store_url",
     "category",
     "logo_url",
-    "banner_url",
+    "banner_url"
   ];
 
   const filteredData = {};
@@ -42,7 +42,7 @@ const editShop = async ({ shopId, ownerId, data }) => {
 
   const shop = await Shop.findOne({
     _id: shopId,
-    owner_id: ownerId,
+    owner_id: ownerId
   });
 
   if (!shop) {
@@ -63,7 +63,7 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price }) => {
   const shop = await Shop.findOne({
     _id: shopId,
     owner_id: sellerId,
-    status: "active",
+    status: "active"
   });
 
   if (!shop) {
@@ -80,7 +80,7 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price }) => {
 
   const existingProduct = await Product.findOne({
     shop_id: shopId,
-    name: { $regex: `^${name}$`, $options: "i" },
+    name: { $regex: `^${name}$`, $options: "i" }
   });
 
   if (existingProduct) {
@@ -91,7 +91,7 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price }) => {
     shop_id: shopId,
     name,
     quantity,
-    price,
+    price
   });
 };
 
@@ -115,7 +115,7 @@ const createOrder = async (buyer_id, items) => {
       }
 
       const product = await Product.findById(item.product_id);
-      if (!product) throw new AppError("Product not found", 404);
+      if (!product) {throw new AppError("Product not found", 404);}
 
       // 🔹 Derive shop_id from first product
       if (index === 0) {
@@ -141,7 +141,7 @@ const createOrder = async (buyer_id, items) => {
       orderItems.push({
         product_id: product._id,
         price: product.price,
-        quantity: item.quantity,
+        quantity: item.quantity
       });
 
       const originalQuantity = product.quantity;
@@ -165,12 +165,12 @@ const createOrder = async (buyer_id, items) => {
       total_amount,
       status: "pending",
       payment_status: "unpaid",
-      escrow_status: "pending",
+      escrow_status: "pending"
     });
 
     const finalItems = orderItems.map(i => ({
       ...i,
-      order_id: order._id,
+      order_id: order._id
     }));
 
     const createdItems = await OrderItem.insertMany(finalItems);
@@ -204,21 +204,18 @@ const getProductById = async (productId) => {
   try {
     return await Product.findById(productId);
   } catch (error) {
-    return res.status(500).json({
-      message: "Error while fetching product",
-      error: error.message,
-    });
+    return error;
   }
 };
 
 const getOrdersByShopId = async (shop_id) => {
- const orders = await Order.find({ shop_id })
+  const orders = await Order.find({ shop_id })
     .populate("buyer_id", "firstName lastName email phone")
     .populate("shop_id")
     .sort({ createdAt: -1 })
     .lean();
 
-  for (let order of orders) {
+  for (const order of orders) {
     const items = await OrderItem.find({ order_id: order._id })
       .populate({
         path: "product_id",
@@ -255,5 +252,5 @@ module.exports = {
   getOrdersById,
   getAllProduct,
   getProductById,
-  getOrdersByShopId,
+  getOrdersByShopId
 };

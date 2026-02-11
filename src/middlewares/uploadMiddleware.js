@@ -10,7 +10,7 @@ const ALLOWED_MIMES = [
   "image/png",
   "image/webp",
   "image/gif",
-  "application/pdf",
+  "application/pdf"
 ];
 
 const fileFilter = (req, file, cb) => {
@@ -29,16 +29,16 @@ const fileFilter = (req, file, cb) => {
 const sellerOnboardUpload = multer({
   storage: memoryStorage,
   limits: { fileSize: MAX_FILE_SIZE },
-  fileFilter,
+  fileFilter
 }).fields([
   { name: "shopLogo", maxCount: 1 },
   { name: "shopBanner", maxCount: 1 },
   { name: "idDocument", maxCount: 1 },
   { name: "proofOfResidence", maxCount: 1 },
   { name: "businessCac", maxCount: 1 },
-  { name: "passportPhotograph", maxCount: 1 },
+  { name: "passportPhotograph", maxCount: 1 }
 ]);
 
 module.exports = {
-  sellerOnboardUpload,
+  sellerOnboardUpload
 };

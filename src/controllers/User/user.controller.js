@@ -1,6 +1,6 @@
-const user = require('@models/userModel/user.js');
-const asyncHandler = require('express-async-handler');
-const AppError = require('@utils/Error/AppError.js');
+const user = require("@models/userModel/user.js");
+const asyncHandler = require("express-async-handler");
+const AppError = require("@utils/Error/AppError.js");
 
 /**
  * Upgrade user to seller role
@@ -12,21 +12,21 @@ const upgradeToSeller = asyncHandler(async (req, res) => {
 
     const User = await user.findById(id);
     if (!User) {
-      throw new AppError('User not found', 404);
+      throw new AppError("User not found", 404);
     }
 
     // Get current roles array
     const currentRoles = Array.isArray(User.roles) ? User.roles : [];
 
     // Seller implies buyer (business rule). Only add seller if not already present.
-    if (!currentRoles.includes('buyer')) currentRoles.push('buyer');
-    if (!currentRoles.includes('seller')) currentRoles.push('seller');
+    if (!currentRoles.includes("buyer")) {currentRoles.push("buyer");}
+    if (!currentRoles.includes("seller")) {currentRoles.push("seller");}
     User.roles = currentRoles;
     await User.save();
 
     res.status(200).json({
       success: true,
-      message: 'User upgraded to seller successfully',
+      message: "User upgraded to seller successfully",
       user: {
         _id: User._id,
         firstName: User.firstName,
@@ -36,8 +36,8 @@ const upgradeToSeller = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error upgrading user to seller:', error.message);
-    throw new AppError(error.message || 'Error upgrading user to seller', error.statusCode || 500);
+    console.error("Error upgrading user to seller:", error.message);
+    throw new AppError(error.message || "Error upgrading user to seller", error.statusCode || 500);
   }
 });
 
@@ -51,22 +51,22 @@ const upgradeToCooperative = asyncHandler(async (req, res) => {
 
     const User = await user.findById(id);
     if (!User) {
-      throw new AppError('User not found', 404);
+      throw new AppError("User not found", 404);
     }
 
     // Get current roles array
     const currentRoles = Array.isArray(User.roles) ? User.roles : [];
 
     // Cooperative member has seller capability. Ensure cooperative, seller, and buyer.
-    if (!currentRoles.includes('buyer')) currentRoles.push('buyer');
-    if (!currentRoles.includes('seller')) currentRoles.push('seller');
-    if (!currentRoles.includes('cooperative')) currentRoles.push('cooperative');
+    if (!currentRoles.includes("buyer")) {currentRoles.push("buyer");}
+    if (!currentRoles.includes("seller")) {currentRoles.push("seller");}
+    if (!currentRoles.includes("cooperative")) {currentRoles.push("cooperative");}
     User.roles = currentRoles;
     await User.save();
 
     res.status(200).json({
       success: true,
-      message: 'User upgraded to cooperative successfully',
+      message: "User upgraded to cooperative successfully",
       user: {
         _id: User._id,
         firstName: User.firstName,
@@ -76,8 +76,8 @@ const upgradeToCooperative = asyncHandler(async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error upgrading user to cooperative:', error.message);
-    throw new AppError(error.message || 'Error upgrading user to cooperative', error.statusCode || 500);
+    console.error("Error upgrading user to cooperative:", error.message);
+    throw new AppError(error.message || "Error upgrading user to cooperative", error.statusCode || 500);
   }
 });
 

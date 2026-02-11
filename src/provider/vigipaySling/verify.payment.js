@@ -33,18 +33,18 @@ exports.verifyPayment = async (req, res) => {
       return res.json({
         success: false,
         status: payment.vigipayStatus,
-        payment,
+        payment
       });
     }
 
     const order = await Order.findById(payment.orderId);
-    if (!order) throw new Error("Order not found");
+    if (!order) {throw new Error("Order not found");}
 
     if (order.payment_status === "paid") {
       return res.json({
         success: true,
         message: "Payment already processed",
-        payment,
+        payment
       });
     }
 
@@ -55,7 +55,7 @@ exports.verifyPayment = async (req, res) => {
 
     const platformOwner = await User.findOne({
       roles: { $in: ["admin"] },
-      walletId: { $exists: true },
+      walletId: { $exists: true }
     });
 
     if (!platformOwner) {
@@ -73,25 +73,25 @@ exports.verifyPayment = async (req, res) => {
       channel: "vigipay",
       beneficiaryAccount: platformOwner.walletId,
       rawWebhookPayload: data,
-      transactionDate: new Date(),
+      transactionDate: new Date()
     });
 
     const shop = await Shop.findById(order.shop_id);
-     if (!shop) throw new Error("Shop not found");
+    if (!shop) {throw new Error("Shop not found");}
 
     const seller = await User.findById(shop.owner_id);
-     if (!seller) throw new Error("Seller not found");
+    if (!seller) {throw new Error("Seller not found");}
 
-     seller.pending_amount =
+    seller.pending_amount =
           (seller.pending_amount || 0) + order.total_amount;
 
-     await seller.save();
+    await seller.save();
 
     return res.json({
       success: true,
       message: "Payment verified and escrow held",
       payment,
-      order,
+      order
     });
 
   } catch (err) {

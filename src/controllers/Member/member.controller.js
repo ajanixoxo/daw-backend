@@ -36,7 +36,7 @@ const join = async (req, res) => {
     const member = await MemberService.joinCooperative({
       userId,
       cooperativeId,
-      subscriptionTierId,
+      subscriptionTierId
     });
     return res.status(201).json({ message: "Joined", member });
   } catch (err) {
@@ -65,7 +65,7 @@ const listMembers = async (req, res) => {
 const getMember = async (req, res) => {
   try {
     const member = await MemberService.getById(req.params.id);
-    if (!member) return res.status(404).json({ error: "Not found" });
+    if (!member) {return res.status(404).json({ error: "Not found" });}
     return res.json(member);
   } catch (err) {
     return res.status(400).json({ error: err.message });
@@ -87,12 +87,12 @@ const guestJoin = async (req, res) => {
       lastName,
       phone,
       cooperativeId,
-      subscriptionTierId,
+      subscriptionTierId
     } = req.body || {};
 
     if (!email || !password || !confirmPassword || !firstName || !phone || !cooperativeId || !subscriptionTierId) {
       return res.status(400).json({
-        error: "email, password, confirmPassword, firstName, phone, cooperativeId, and subscriptionTierId are required",
+        error: "email, password, confirmPassword, firstName, phone, cooperativeId, and subscriptionTierId are required"
       });
     }
     if (password !== confirmPassword) {
@@ -112,7 +112,7 @@ const guestJoin = async (req, res) => {
     const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
     if (existingUser) {
       return res.status(400).json({
-        error: "User already exists. Please log in and use the Join Cooperative flow.",
+        error: "User already exists. Please log in and use the Join Cooperative flow."
       });
     }
 
@@ -128,7 +128,7 @@ const guestJoin = async (req, res) => {
       roles: ["buyer"],
       isVerified: false,
       otp,
-      otpExpiry,
+      otpExpiry
     });
 
     await verificationEmailTemplate(newUser.email, newUser.firstName, otp);
@@ -144,7 +144,7 @@ const guestJoin = async (req, res) => {
     const member = await MemberService.joinCooperative({
       userId: newUser._id,
       cooperativeId,
-      subscriptionTierId,
+      subscriptionTierId
     });
 
     return res.status(201).json({
@@ -158,8 +158,8 @@ const guestJoin = async (req, res) => {
         email: newUser.email,
         phone: newUser.phone,
         verified: newUser.isVerified,
-        roles: newUser.roles,
-      },
+        roles: newUser.roles
+      }
     });
   } catch (err) {
     return res.status(400).json({ error: err.message });
