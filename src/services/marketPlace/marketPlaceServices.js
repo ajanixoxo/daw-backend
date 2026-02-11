@@ -31,7 +31,7 @@ const editShop = async ({ shopId, ownerId, data }) => {
     "logo_url",
     "banner_url",
     "contact_number",
-    "business_address",
+    "business_address"
   ];
 
   const filteredData = {};
@@ -104,7 +104,7 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
     variants: variants || [],
     productFeatures: productFeatures || "",
     careInstruction: careInstruction || "",
-    returnPolicy: returnPolicy || "",
+    returnPolicy: returnPolicy || ""
   });
 };
 
@@ -119,7 +119,7 @@ const editProduct = async ({ sellerId, productId, updates }) => {
   const shop = await Shop.findOne({
     _id: product.shop_id,
     owner_id: sellerId,
-    status: "active",
+    status: "active"
   });
 
   if (!shop) {
@@ -129,7 +129,7 @@ const editProduct = async ({ sellerId, productId, updates }) => {
   const allowedFields = [
     "name", "description", "category", "quantity", "price",
     "images", "status", "variants", "productFeatures",
-    "careInstruction", "returnPolicy",
+    "careInstruction", "returnPolicy"
   ];
 
   const filteredUpdates = {};
@@ -148,7 +148,7 @@ const editProduct = async ({ sellerId, productId, updates }) => {
     const duplicate = await Product.findOne({
       shop_id: product.shop_id,
       _id: { $ne: productId },
-      name: { $regex: `^${filteredUpdates.name}$`, $options: "i" },
+      name: { $regex: `^${filteredUpdates.name}$`, $options: "i" }
     });
     if (duplicate) {
       throw new AppError("Another product with this name already exists", 409);
@@ -167,7 +167,7 @@ const deleteProduct = async ({ sellerId, productId }) => {
 
   const shop = await Shop.findOne({
     _id: product.shop_id,
-    owner_id: sellerId,
+    owner_id: sellerId
   });
 
   if (!shop) {
@@ -360,5 +360,5 @@ module.exports = {
   getProductById,
   getOrdersByShopId,
   recordShopView,
-  getShopViewCount,
+  getShopViewCount
 };

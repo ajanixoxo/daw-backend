@@ -36,14 +36,14 @@ const sellerOnboardUpload = multer({
   { name: "idDocument", maxCount: 1 },
   { name: "proofOfResidence", maxCount: 1 },
   { name: "businessCac", maxCount: 1 },
-  { name: "passportPhotograph", maxCount: 1 },
+  { name: "passportPhotograph", maxCount: 1 }
 ]);
 
 const IMAGE_MIMES = [
   "image/jpeg",
   "image/png",
   "image/webp",
-  "image/gif",
+  "image/gif"
 ];
 
 const imageFileFilter = (req, file, cb) => {
@@ -61,7 +61,7 @@ const imageFileFilter = (req, file, cb) => {
 const productImagesUpload = multer({
   storage: memoryStorage,
   limits: { fileSize: MAX_FILE_SIZE },
-  fileFilter: imageFileFilter,
+  fileFilter: imageFileFilter
 }).array("images", 4);
 
 /**
@@ -70,14 +70,14 @@ const productImagesUpload = multer({
 const shopEditUpload = multer({
   storage: memoryStorage,
   limits: { fileSize: MAX_FILE_SIZE },
-  fileFilter: imageFileFilter,
+  fileFilter: imageFileFilter
 }).fields([
   { name: "shopLogo", maxCount: 1 },
-  { name: "shopBanner", maxCount: 1 },
+  { name: "shopBanner", maxCount: 1 }
 ]);
 
 module.exports = {
   sellerOnboardUpload,
   productImagesUpload,
-  shopEditUpload,
+  shopEditUpload
 };
