@@ -9,9 +9,9 @@ const vigipayClient = axios.create({
 
   headers: {
     "Content-Type": "application/json",
-    ApiKey: process.env.VIGIPAY_INTEGRATION_KEY,
+    ApiKey: process.env.VIGIPAY_INTEGRATION_KEY
   },
-  timeout: 20000,
+  timeout: 20000
 });
 
 vigipayClient.interceptors.request.use(async (config) => {

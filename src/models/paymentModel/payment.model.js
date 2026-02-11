@@ -15,7 +15,7 @@ const PaymentSchema = new mongoose.Schema(
     vigipayStatus: {
       type: String,
       enum: ["pending", "successful", "failed"],
-      default: "pending",
+      default: "pending"
     },
 
     amountAfterCharge: Number,
@@ -23,7 +23,7 @@ const PaymentSchema = new mongoose.Schema(
 
     rawResponse: Object,
     orderId: {
-      type: String,
+      type: String
       // ref: "Order",
     },
     name: String,
@@ -35,7 +35,7 @@ const PaymentSchema = new mongoose.Schema(
     address: [String],
     zipCode: String,
     logisticsInfo: String,
-    DeliveryAddress: String,
+    DeliveryAddress: String
   },
   { timestamps: true }
 );

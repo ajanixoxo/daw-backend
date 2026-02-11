@@ -10,7 +10,7 @@ const SubscriptionTier = require("../models/subscriptionTierModel/subscriptionTi
 module.exports = {
   async createCooperative(data) {
     const exists = await Cooperative.findOne({ name: data.name });
-    if (exists) throw new Error("Cooperative name already exists");
+    if (exists) {throw new Error("Cooperative name already exists");}
     // if subscriptionTiers provided as objects, create them
     let tierIds = [];
     if (data.subscriptionTiers && data.subscriptionTiers.length) {

@@ -1,27 +1,27 @@
 const mongoose = require("mongoose");
 
 const shopViewSchema = new mongoose.Schema({
-    shop_id: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Shop",
-        required: true
-    },
-    viewer_id: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        default: null
-    },
-    ip_address: {
-        type: String
-    },
-    view_date: {
-        type: String,
-        required: true
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
+  shop_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Shop",
+    required: true
+  },
+  viewer_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null
+  },
+  ip_address: {
+    type: String
+  },
+  view_date: {
+    type: String,
+    required: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 
 // Query performance index
