@@ -2,11 +2,11 @@ const express = require("express");
 const {
   protect,
   protectOptional,
-  restrictTo,
-} = require('@middlewares/authMiddleware.js');
-const marketplaceController = require('@controllers/marketPlace/marketplaceController.js');
-const categoryController = require('@controllers/marketPlace/categoryController.js');
-const { sellerOnboardUpload, productImagesUpload, shopEditUpload } = require('@middlewares/uploadMiddleware.js');
+  restrictTo
+} = require("@middlewares/authMiddleware.js");
+const marketplaceController = require("@controllers/marketPlace/marketplaceController.js");
+const categoryController = require("@controllers/marketPlace/categoryController.js");
+const { sellerOnboardUpload, productImagesUpload, shopEditUpload } = require("@middlewares/uploadMiddleware.js");
 
 const router = express.Router();
 

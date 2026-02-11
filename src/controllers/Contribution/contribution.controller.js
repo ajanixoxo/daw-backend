@@ -159,7 +159,7 @@ const getLoanEligibility = async (req, res) => {
         .populate("userId", "firstName lastName email")
         .lean();
 
-      if (!member || !member.userId) continue;
+      if (!member || !member.userId) {continue;}
 
       // Get contribution type name
       let typeName = "N/A";

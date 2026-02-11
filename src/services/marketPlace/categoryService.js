@@ -6,7 +6,7 @@ const createCategory = async ({ shopId, ownerId, name, description, color }) => 
   const shop = await Shop.findOne({
     _id: shopId,
     owner_id: ownerId,
-    status: "active",
+    status: "active"
   });
 
   if (!shop) {
@@ -15,7 +15,7 @@ const createCategory = async ({ shopId, ownerId, name, description, color }) => 
 
   const existing = await Category.findOne({
     shop_id: shopId,
-    name: { $regex: `^${name}$`, $options: "i" },
+    name: { $regex: `^${name}$`, $options: "i" }
   });
 
   if (existing) {
@@ -26,7 +26,7 @@ const createCategory = async ({ shopId, ownerId, name, description, color }) => 
     shop_id: shopId,
     name,
     description: description || "",
-    color: color || "#f10e7c",
+    color: color || "#f10e7c"
   });
 };
 
@@ -36,5 +36,5 @@ const getCategoriesByShop = async (shopId) => {
 
 module.exports = {
   createCategory,
-  getCategoriesByShop,
+  getCategoriesByShop
 };
