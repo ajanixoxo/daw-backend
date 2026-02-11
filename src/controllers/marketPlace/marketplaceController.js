@@ -953,6 +953,26 @@ const editShops = asyncHandler(async (req, res) => {
   });
 });
 
+// Track a shop view (works for guests and logged-in users)
+const trackShopView = asyncHandler(async (req, res) => {
+  const { id: shopId } = req.params;
+  const viewerId = req.user ? req.user._id : null;
+  const ipAddress = req.ip;
+
+  await marketplaceService.recordShopView(shopId, viewerId, ipAddress);
+
+  res.status(201).json({ success: true });
+});
+
+// Get shop stats (view count) for the shop owner
+const getShopStats = asyncHandler(async (req, res) => {
+  const { id: shopId } = req.params;
+
+  const viewCount = await marketplaceService.getShopViewCount(shopId);
+
+  res.status(200).json({ success: true, viewCount });
+});
+
 module.exports = {
   createShop,
   sellerOnboard,
@@ -973,5 +993,7 @@ module.exports = {
   getAllProduct,
   getProduct,
   getSellerDetails,
-  editShops
+  editShops,
+  trackShopView,
+  getShopStats,
 }

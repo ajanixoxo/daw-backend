@@ -23,6 +23,8 @@ router.post("/create/shops", protect, restrictTo("admin", "seller", "buyer"), ma
 router.get("/get/shops", marketplaceController.getShops);
 router.get("/my-shop", protect, restrictTo("seller"), marketplaceController.getMyShop);
 router.get("/get/shops/:id", marketplaceController.getShopById);
+router.post("/shops/:id/views", protectOptional, marketplaceController.trackShopView);
+router.get("/shops/:id/stats", protect, restrictTo("seller"), marketplaceController.getShopStats);
 router.put("/edit/shops/:id", protect, restrictTo("seller"), shopEditUpload, marketplaceController.editShops);
 
 // Categories
