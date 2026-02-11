@@ -1,7 +1,7 @@
 const axios = require("axios");
 const Payment = require("@models/paymentModel/payment.model.js");
 const Order = require("@models/marketPlace/orderModel.js");
-const Shop = require("@models/marketPlace/shop.js");
+const Shop = require("@models/marketPlace/shopModel.js");
 const WalletLedger = require("@models/walletLedger/ledger.js");
 const User = require("@models/userModel/user.js");
 
