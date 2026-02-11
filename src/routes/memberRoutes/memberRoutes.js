@@ -16,7 +16,7 @@ router.post("/join/guest", guestJoin);
 // Join cooperative: allowed for buyer (CASE 2) and seller (CASE 1). Guest use POST /join/guest.
 router.post("/join", protect, restrictTo("buyer", "seller"), join);
 router.put("/:id/approve", protect, restrictTo("admin", "cooperative", "member"), approve);
-router.get("/cooperative/:cooperativeId", protect, restrictTo("admin", "cooperative", "member"), listMembers);
+router.get("/cooperative/:cooperativeId", protect, restrictTo("admin", "cooperative", "cooperative_admin", "member", "seller", "buyer"), listMembers);
 router.get("/:id", protect, restrictTo("admin", "cooperative", "member"), getMember);
 
 module.exports = router;
