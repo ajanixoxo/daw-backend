@@ -1,6 +1,7 @@
 const axios = require("axios");
 const Payment = require("@models/paymentModel/payment.model.js");
 const Order = require("@models/marketPlace/orderModel.js");
+const Shop = require("@models/marketPlace/shop.js");
 const WalletLedger = require("@models/walletLedger/ledger.js");
 const User = require("@models/userModel/user.js");
 
@@ -75,7 +76,17 @@ exports.verifyPayment = async (req, res) => {
       transactionDate: new Date(),
     });
 
-    
+    const shop = await Shop.findById(order.shop_id);
+     if (!shop) throw new Error("Shop not found");
+
+    const seller = await User.findById(shop.owner_id);
+     if (!seller) throw new Error("Seller not found");
+
+     seller.pending_amount =
+          (seller.pending_amount || 0) + order.total_amount;
+
+     await seller.save();
+
     return res.json({
       success: true,
       message: "Payment verified and escrow held",

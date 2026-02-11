@@ -2,7 +2,7 @@ const axios = require("axios");
 const dotenv = require("dotenv");
 dotenv.config();
 
-const { loginAndGetToken } = require("../../provider/vigipaySling/vigipayAuth.js/auth.js");
+const { loginAndGetToken } = require("../../provider/vigipaySling/vigipayAuth/auth.js");
 
 const vigipayClient = axios.create({
   baseURL: process.env.VIGIPAY_CUSTOMER_BASE_URL,

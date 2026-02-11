@@ -174,11 +174,15 @@ const UserSchema = new mongoose.Schema(
     bankCode: {
       type: String,
     },
-    aacount_Balance: {
+    account_Balance: {
       type: Number,
     },
     wallet_balance: {
       type: Number,
+    },
+    pending_amount: {
+      type: Number,
+      default: 0
     }
 
   },

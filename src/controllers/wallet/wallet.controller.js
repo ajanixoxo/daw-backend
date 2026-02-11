@@ -57,6 +57,12 @@ exports.getBusinessWallet = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+
+    if(user.roles != "admin"){
+      return res.status(400).json({
+        message: "you are not eligible"
+      });
+    }
     console.log("vigipay starting")
     const response = await vigipayClient.get("/api/Wallet/businessWallet");
     console.log("response for wallet from vigipay", response);
@@ -97,6 +103,12 @@ exports.updateWalletPin = async (req, res) => {
       return res.status(404).json({ message: "Wallet not found" });
     }
 
+    if(user.roles != "admin"){
+      return res.status(400).json({
+        message: "you are not eligible"
+      });
+    }
+
     const response = await vigipayClient.put(
       "/api/Wallet/updatePin",
       {
@@ -131,6 +143,12 @@ exports.processPayout = async (req, res) => {
       return res.status(404).json({ message: "Wallet not found" });
     }
 
+    if(user.roles != "admin"){
+      return res.status(400).json({
+        message: "you are not eligible"
+      });
+    }
+    
     const existingLedger = await walletLedger.findOne({
       reference,
       type: "DEBIT",
@@ -327,7 +345,7 @@ exports.getAccount = async (req, res) => {
 exports.walletLedgerController = async(res, req) => {
   try {
     const userId = req.user._id;
-    const user = await user.findById(userId);
+    const user = await User.findById(userId);
 
     if(!user){
         return res.status(400).json({
@@ -359,3 +377,116 @@ exports.walletLedgerController = async(res, req) => {
     });
   }
 }
+
+exports.payFromStaticWallet = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const {
+      recipient_account_number,
+      recipient_account_name,
+      recipient_bank_code,
+      amount,
+      narration,
+    } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid transfer amount",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user || !user.accountNo) {
+      return res.status(404).json({
+        success: false,
+        message: "Virtual account not found",
+      });
+    }
+    //we are generating refrence to make sure that if the transfer fails we can easily identify the failed transaction and update the ledger accordingly
+    const reference = `ADV-${Date.now()}-${user._id}`;
+
+    // fetching balance to validate if the user has sufficient money to transfer or not
+    const walletRes = await vigipayClient.get(
+      `/api/v2/client/wallet?account_number=${user.accountNo}`
+    );
+
+    if (!walletRes.data.status) {
+      return res.status(400).json({
+        success: false,
+        message: walletRes.data.message,
+      });
+    }
+
+    const walletData = walletRes.data.data[0];
+    const availableBalance = walletData.availableBalance;
+
+    if (availableBalance < amount) {
+      return res.status(400).json({
+        success: false,
+        message: "Insufficient balance",
+        availableBalance,
+      });
+    }
+
+    // wallet entry with pending status
+    const ledger = await walletLedger.create({
+      userId: user._id,
+      reference,
+      type: "DEBIT",
+      amount,
+      status: "PENDING",
+      beneficiaryAccount: recipient_account_number,
+      channel: "vigipay",
+      transactionDate: new Date(),
+    });
+
+    // calling api to transfer money
+    const transferRes = await vigipayClient.post(
+      "/api/v2/client/wallet/transfer",
+      {
+        sender_account_number: user.accountNo,
+        recipient_account_number,
+        recipient_account_name,
+        recipient_bank_code,
+        amount,
+        narration,
+        reference,
+      }
+    );
+
+    // update ledger
+    ledger.status = "SUCCESS";
+    ledger.rawWebhookPayload = transferRes.data;
+    await ledger.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Transfer successful",
+      reference,
+      data: transferRes.data,
+    });
+  } catch (error) {
+    console.error("Static wallet transfer error:", error);
+
+    if (error?.config?.data) {
+      try {
+        const parsed = JSON.parse(error.config.data);
+        if (parsed.reference) {
+          await walletLedger.findOneAndUpdate(
+            { reference: parsed.reference },
+            { status: "FAILED" }
+          );
+        }
+      } catch (e) {}
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Transfer failed",
+      error: error.response?.data || error.message,
+    });
+  }
+};

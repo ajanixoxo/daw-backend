@@ -21,7 +21,10 @@ router.post('/payout', protect,restrictTo("admin"), walletController.processPayo
 // Update PIN
 router.put("/update-pin", protect, restrictTo("admin"), walletController.updateWalletPin);
 
-router.get("/get/account", protect, restrictTo("seller", "admin"), walletController.getAccount);
+router.get("/get/account", protect, restrictTo("seller"), walletController.getAccount);
 
 router.get('/ledger', protect, restrictTo('admin'), walletController.walletLedgerController);
+
+router.post('/transfer/money', protect, restrictTo('seller'), walletController.payFromStaticWallet);
+
 module.exports = router;
