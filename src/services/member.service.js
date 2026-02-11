@@ -81,7 +81,7 @@ module.exports = {
     const u = await User.findById(userId);
     if (u) {
       const roles = new Set(Array.isArray(u.roles) ? u.roles : []);
-      roles.add("cooperative");
+      roles.add("member");
       u.roles = [...roles];
       await u.save();
     }
@@ -90,7 +90,11 @@ module.exports = {
   },
 
   async getMembers(cooperativeId) {
-    return Member.find({ cooperativeId }).populate("subscriptionTierId userId").lean();
+    return Member.find({ cooperativeId })
+      .populate("userId", "firstName lastName email phone roles status")
+      .populate("subscriptionTierId", "name monthlyContribution")
+      .sort({ createdAt: -1 })
+      .lean();
   },
 
   async updateStatus(id, status) {

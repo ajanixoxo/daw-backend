@@ -2,6 +2,7 @@ const Shop = require("@models/marketPlace/shopModel.js");
 const Product = require("@models/marketPlace/productModel.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const OrderItem = require("@models/marketPlace/orderItemModel.js");
+const ShopView = require("@models/marketPlace/shopViewModel.js");
 const AppError = require("@utils/Error/AppError.js");
 const mongoose = require("mongoose");
 
@@ -14,19 +15,23 @@ const createShop = async (data) => {
   return Shop.create(data);
 };
 const getShops = async () => await Shop.find();
-const getShopById = async (id) =>{ 
-  await Shop.findById(id);
+const getShopById = async (id) => {
+  return await Shop.findById(id);
+};
 
+const getShopByOwnerId = async (ownerId) => {
+  return await Shop.findOne({ owner_id: ownerId });
 };
 
 const editShop = async ({ shopId, ownerId, data }) => {
   const allowedFields = [
     "name",
     "description",
-    "store_url",
     "category",
     "logo_url",
-    "banner_url"
+    "banner_url",
+    "contact_number",
+    "business_address",
   ];
 
   const filteredData = {};
@@ -59,7 +64,7 @@ const editShop = async ({ shopId, ownerId, data }) => {
 
 
 // PRODUCT
-const createProduct = async ({ sellerId, shopId, name, quantity, price }) => {
+const createProduct = async ({ sellerId, shopId, name, quantity, price, category, description, images, status, variants, productFeatures, careInstruction, returnPolicy }) => {
   const shop = await Shop.findOne({
     _id: shopId,
     owner_id: sellerId,
@@ -91,11 +96,87 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price }) => {
     shop_id: shopId,
     name,
     quantity,
-    price
+    price,
+    category,
+    description,
+    images: images || [],
+    status: status || "available",
+    variants: variants || [],
+    productFeatures: productFeatures || "",
+    careInstruction: careInstruction || "",
+    returnPolicy: returnPolicy || "",
   });
 };
 
 const getProductsByShop = async (shop_id) => await Product.find({ shop_id });
+
+const editProduct = async ({ sellerId, productId, updates }) => {
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new AppError("Product not found", 404);
+  }
+
+  const shop = await Shop.findOne({
+    _id: product.shop_id,
+    owner_id: sellerId,
+    status: "active",
+  });
+
+  if (!shop) {
+    throw new AppError("Unauthorized or inactive shop", 403);
+  }
+
+  const allowedFields = [
+    "name", "description", "category", "quantity", "price",
+    "images", "status", "variants", "productFeatures",
+    "careInstruction", "returnPolicy",
+  ];
+
+  const filteredUpdates = {};
+  for (const key of Object.keys(updates)) {
+    if (allowedFields.includes(key) && updates[key] !== undefined) {
+      filteredUpdates[key] = updates[key];
+    }
+  }
+
+  if (Object.keys(filteredUpdates).length === 0) {
+    throw new AppError("No valid fields provided", 400);
+  }
+
+  // If renaming, check for duplicates (exclude self)
+  if (filteredUpdates.name) {
+    const duplicate = await Product.findOne({
+      shop_id: product.shop_id,
+      _id: { $ne: productId },
+      name: { $regex: `^${filteredUpdates.name}$`, $options: "i" },
+    });
+    if (duplicate) {
+      throw new AppError("Another product with this name already exists", 409);
+    }
+  }
+
+  Object.assign(product, filteredUpdates);
+  return await product.save();
+};
+
+const deleteProduct = async ({ sellerId, productId }) => {
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new AppError("Product not found", 404);
+  }
+
+  const shop = await Shop.findOne({
+    _id: product.shop_id,
+    owner_id: sellerId,
+  });
+
+  if (!shop) {
+    throw new AppError("Unauthorized to delete this product", 403);
+  }
+
+  await Product.findByIdAndDelete(productId);
+  return { message: "Product deleted successfully" };
+};
 
 // ORDER
 const createOrder = async (buyer_id, items) => {
@@ -240,17 +321,44 @@ const getOrdersByShopId = async (shop_id) => {
   return orders;
 };
 
+// SHOP VIEWS
+const recordShopView = async (shopId, viewerId, ipAddress) => {
+  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+  // For logged-in users: deduplicate by user ID (ignore IP — it can vary)
+  // For guests: deduplicate by IP address
+  const filter = viewerId
+    ? { shop_id: shopId, viewer_id: viewerId, view_date: today }
+    : { shop_id: shopId, viewer_id: null, ip_address: ipAddress, view_date: today };
+
+  // Atomic upsert — even simultaneous requests only create one document
+  return ShopView.findOneAndUpdate(
+    filter,
+    { $setOnInsert: { shop_id: shopId, viewer_id: viewerId || null, ip_address: ipAddress, view_date: today } },
+    { upsert: true, new: true }
+  );
+};
+
+const getShopViewCount = async (shopId) => {
+  return ShopView.countDocuments({ shop_id: shopId });
+};
+
 module.exports = {
   createShop,
   getShops,
   getShopById,
+  getShopByOwnerId,
   editShop,
   createProduct,
+  editProduct,
+  deleteProduct,
   getProductsByShop,
   createOrder,
   getOrdersByBuyer,
   getOrdersById,
   getAllProduct,
   getProductById,
-  getOrdersByShopId
+  getOrdersByShopId,
+  recordShopView,
+  getShopViewCount,
 };

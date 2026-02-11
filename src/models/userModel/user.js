@@ -112,8 +112,28 @@ const UserSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["active", "suspended"],
-      default: "active"
+      enum: ["active", "suspended", "invited"],
+      default: "active",
+    },
+
+    invitationToken: {
+      type: String,
+      select: false,
+    },
+
+    invitationExpires: {
+      type: Date,
+      select: false,
+    },
+
+    invitationToken: {
+      type: String,
+      select: false,
+    },
+
+    invitationExpires: {
+      type: Date,
+      select: false,
     },
 
     refreshToken: {

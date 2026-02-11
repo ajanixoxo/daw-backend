@@ -58,8 +58,8 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     // Cooperative logic (if needed)
-    if (normalizedRoles.includes("cooperative")) {
-      rolesSet.add("cooperative");
+    if (normalizedRoles.includes("member")) {
+      rolesSet.add("member");
       rolesSet.add("buyer"); // optional but recommended
     }
 
