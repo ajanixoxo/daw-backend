@@ -350,7 +350,7 @@ exports.getAccount = async (req, res) => {
 
 
 
-exports.walletLedgerController = async(res, req) => {
+exports.walletLedgerController = async(req, res) => {
   try {
     const userId = req.user._id;
     const user = await User.findById(userId);
@@ -362,14 +362,18 @@ exports.walletLedgerController = async(res, req) => {
       });
     }
      
-    const wallet = await walletLedger.find();
-    // console.log("wallet ledger", wallet);
-    if(!wallet){
-      return res.status(400).json({
-        success: false,
-        message:"Wallet does not exist"
-      });
+    let filter = {};
+
+    if (user.roles && user.roles.includes("admin")) {
+      filter = {}; 
+    } 
+    else {
+      filter = { userId: user._id };
     }
+
+    const wallet = await walletLedger
+      .find(filter)
+      .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
