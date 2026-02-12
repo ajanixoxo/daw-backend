@@ -3,6 +3,10 @@ const SubscriptionTier = require("../models/subscriptionTierModel/subscriptionTi
 const Cooperative = require("../models/cooperativeModel/cooperative.model.js");
 const Shop = require("../models/marketPlace/shopModel.js");
 const User = require("../models/userModel/user.js");
+const Loan = require("../models/loanModel/loan.model.js");
+const Contribution = require("../models/contributionModel/contribution.model.js");
+const Order = require("../models/marketPlace/orderModel.js");
+const Product = require("../models/marketPlace/productModel.js");
 const marketplaceService = require("./marketPlace/marketPlaceServices.js");
 
 /**
@@ -108,5 +112,86 @@ module.exports = {
 
   async getById(id) {
     return Member.findById(id).populate("subscriptionTierId userId").lean();
+  },
+
+  async getDetails(id) {
+    const member = await Member.findById(id)
+      .populate("userId", "firstName lastName email phone roles status avatar")
+      .populate("subscriptionTierId", "name monthlyContribution")
+      .lean();
+
+    if (!member) return null;
+
+    // Fetch Shop linked to this user
+    const shop = await Shop.findOne({ owner_id: member.userId._id }).lean();
+
+    // Fetch Contribution Stats (Total Paid)
+    const contributionStats = await Contribution.aggregate([
+      { $match: { memberId: member._id, status: "paid" } },
+      { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } }
+    ]);
+    const totalContributions = contributionStats[0]?.total || 0;
+    const contributionsCount = contributionStats[0]?.count || 0;
+
+    // Fetch Loan Stats
+    // Active loans, Total Loans taken
+    const loanStats = await Loan.aggregate([
+      { $match: { memberId: member._id } },
+      {
+        $group: {
+          _id: null,
+          totalLoans: { $sum: 1 },
+          activeLoans: { $sum: { $cond: [{ $in: ["$status", ["active", "disbursed", "approved"]] }, 1, 0] } },
+          totalAmount: { $sum: "$amount" }
+        }
+      }
+    ]);
+    const totalLoans = loanStats[0]?.totalLoans || 0;
+    const activeLoans = loanStats[0]?.activeLoans || 0;
+
+    // Marketplace Stats
+    let totalSales = 0;
+    let ordersCompleted = 0;
+    let productsListed = 0;
+
+    if (shop) {
+      // Products Listed
+      productsListed = await Product.countDocuments({ shop_id: shop._id });
+
+      // Sales & Orders
+      const orderStats = await Order.aggregate([
+         { $match: { shop_id: shop._id } },
+         { 
+           $group: {
+             _id: null,
+             totalSales: { 
+               $sum: { $cond: [{ $eq: ["$payment_status", "paid"] }, "$total_amount", 0] }
+             },
+             ordersCompleted: {
+               $sum: { $cond: [{ $eq: ["$status", "delivered"] }, 1, 0] }
+             }
+           }
+         }
+      ]);
+
+      if (orderStats.length > 0) {
+        totalSales = orderStats[0].totalSales || 0;
+        ordersCompleted = orderStats[0].ordersCompleted || 0;
+      }
+    }
+    
+    return {
+      member,
+      shop,
+      stats: {
+        totalContributions,
+        contributionsCount,
+        totalLoans,
+        activeLoans,
+        totalSales,
+        productsListed,
+        ordersCompleted
+      }
+    };
   }
 };
