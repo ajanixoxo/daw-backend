@@ -292,9 +292,10 @@ async function login(req, res) {
     const User = await user.findOne({ email }).select("+password");
     if (!User) {return res.status(404).json({ message: "User not found" });}
 
+
     const isMatched = await User.comparePassword(password);
     if (!isMatched) {
-      return res.status(400).json({ message: "Invalid password" });
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
     if (!User.isVerified) {
