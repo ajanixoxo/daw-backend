@@ -10,8 +10,10 @@ const {
   forgotPassword,
   resetPassword,
   getUserProfile,
-  updateUserProfile
-} = require("@controllers/Authentication/auth.js");
+  updateUserProfile,
+  changePassword
+} = require('@controllers/Authentication/auth.js');
+
 const { protect } = require("@middlewares/authMiddleware.js");
 const { profileUpload } = require("@middlewares/uploadMiddleware.js");
 
