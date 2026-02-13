@@ -59,11 +59,12 @@ exports.getBusinessWallet = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    if(user.roles !== "admin"){
+    if (!user.roles.includes("admin")) {
       return res.status(400).json({
-        message: "you are not eligible"
+       message: "you are not eligible"
       });
     }
+
     console.log("vigipay starting");
     const response = await vigipayClient.get("/api/Wallet/businessWallet");
     console.log("response for wallet from vigipay", response);
@@ -104,11 +105,11 @@ exports.updateWalletPin = async (req, res) => {
       return res.status(404).json({ message: "Wallet not found" });
     }
 
-    if(user.roles !== "admin"){
-      return res.status(400).json({
+    if (!user.roles.includes("admin")) {
+       return res.status(400).json({
         message: "you are not eligible"
-      });
-    }
+     });
+  }
 
     const response = await vigipayClient.put(
       "/api/Wallet/updatePin",
@@ -138,7 +139,7 @@ exports.processPayout = async (req, res) => {
   let ledger;
   try {
     const userId = req.user._id;
-    const { pin, amount, bankCode, accountNumber, accountName } = req.body;
+    const { pin, amount, bankCode, accountNumber, accountName, sellerId } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
@@ -184,7 +185,7 @@ exports.processPayout = async (req, res) => {
     ledger = await walletLedger.create({
       userId: user._id,
       walletId: user.walletId,
-      reference: merchantRef, 
+      reference: merchantRef,
       merchantRef,
       type: "DEBIT",
       amount,
@@ -214,8 +215,18 @@ exports.processPayout = async (req, res) => {
     ledger.reference = providerReference;
     ledger.rawWebhookPayload = payoutRes.data;
 
-    ledger.status = "PENDING"; 
+    ledger.status = "PENDING";
     await ledger.save();
+
+    // If successful delivery to provider, deduct from seller's virtual account balance
+    if (sellerId) {
+      const seller = await User.findById(sellerId);
+      if (seller) {
+        seller.account_Balance = Math.max(0, (seller.account_Balance || 0) - amount);
+        await seller.save();
+        console.log(`Deducted ${amount} from seller ${sellerId} account_Balance after payout.`);
+      }
+    }
 
     return res.status(200).json({
       message: "Payout initiated successfully",
@@ -350,23 +361,23 @@ exports.getAccount = async (req, res) => {
 
 
 
-exports.walletLedgerController = async(req, res) => {
+exports.walletLedgerController = async (req, res) => {
   try {
     const userId = req.user._id;
     const user = await User.findById(userId);
 
-    if(!user){
+    if (!user) {
       return res.status(400).json({
         success: false,
-        message:"User does not exist"
+        message: "User does not exist"
       });
     }
-     
+
     let filter = {};
 
     if (user.roles && user.roles.includes("admin")) {
-      filter = {}; 
-    } 
+      filter = {};
+    }
     else {
       filter = { userId: user._id };
     }
@@ -377,14 +388,14 @@ exports.walletLedgerController = async(req, res) => {
 
     return res.status(200).json({
       success: true,
-      message:"Wallet fetched successfully",
+      message: "Wallet fetched successfully",
       walletLedger: wallet
     });
 
   } catch (error) {
     console.log("Error during fetching wallet ledger");
     return res.status(500).json({
-      message:"Error in fetching the account",
+      message: "Error in fetching the account",
       error: error.message
     });
   }
@@ -504,3 +515,30 @@ exports.payFromStaticWallet = async (req, res) => {
     });
   }
 };
+
+exports.getMyWalletBalance = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId).select("account_Balance pending_amount");
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const available = user.account_Balance || 0;
+    const pending = user.pending_amount || 0;
+    const total = available + pending;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        total_balance: total,
+        available_balance: available,
+        pending_balance: pending
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
