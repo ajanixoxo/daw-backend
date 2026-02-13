@@ -11,12 +11,15 @@ router.get("/create", protect, restrictTo("admin"), walletController.getBusiness
 router.post("/charge", protect, restrictTo("admin"), walletController.getPayoutCharge);
 
 // Account lookup
-router.post("/account-lookup", protect,restrictTo("seller", "admin"), walletController.accountLookup);
+router.post("/account-lookup", protect, restrictTo("seller", "admin"), walletController.accountLookup);
 
 // Banks list
-router.get("/banks", protect,restrictTo("seller","admin"), walletController.getBanks);
+router.get("/banks", protect, restrictTo("seller", "admin"), walletController.getBanks);
 
-router.post("/payout", protect,restrictTo("admin"), walletController.processPayout);
+router.get("/balance", protect, restrictTo("seller", "admin"), walletController.getMyWalletBalance);
+
+
+router.post("/payout", protect, restrictTo("admin"), walletController.processPayout);
 
 // Update PIN
 router.put("/update-pin", protect, restrictTo("admin"), walletController.updateWalletPin);

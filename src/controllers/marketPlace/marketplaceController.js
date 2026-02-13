@@ -92,23 +92,23 @@ const sellerOnboard = asyncHandler(async (req, res) => {
   const contactNumber = (body.contactNumber || "").trim() || undefined;
   const businessAddress = (body.businessAddress || "").trim() || undefined;
 
-  if (!name) {throw new AppError("Shop name is required", 400);}
-  if (!description) {throw new AppError("Shop description is required", 400);}
-  if (!category) {throw new AppError("Shop category is required", 400);}
+  if (!name) { throw new AppError("Shop name is required", 400); }
+  if (!description) { throw new AppError("Shop description is required", 400); }
+  if (!category) { throw new AppError("Shop category is required", 400); }
 
   const idDoc = Array.isArray(files.idDocument) ? files.idDocument[0] : files.idDocument;
   const proofRes = Array.isArray(files.proofOfResidence) ? files.proofOfResidence[0] : files.proofOfResidence;
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
 
-  if (!idDoc || !idDoc.buffer) {throw new AppError("ID document is required", 400);}
-  if (!proofRes || !proofRes.buffer) {throw new AppError("Proof of residence is required", 400);}
-  if (!businessCacFile || !businessCacFile.buffer) {throw new AppError("Business CAC is required", 400);}
-  if (!passportPhoto || !passportPhoto.buffer) {throw new AppError("Passport photograph is required", 400);}
+  if (!idDoc || !idDoc.buffer) { throw new AppError("ID document is required", 400); }
+  if (!proofRes || !proofRes.buffer) { throw new AppError("Proof of residence is required", 400); }
+  if (!businessCacFile || !businessCacFile.buffer) { throw new AppError("Business CAC is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
 
   const owner_id = req.user._id;
   const foundUser = await User.findById(owner_id);
-  if (!foundUser) {throw new AppError("User not found", 404);}
+  if (!foundUser) { throw new AppError("User not found", 404); }
 
   const folderDocs = "daw/seller-documents";
   const folderShop = "daw/shops";
@@ -164,7 +164,7 @@ const sellerOnboard = asyncHandler(async (req, res) => {
     currentRoles.push("seller");
     foundUser.roles = currentRoles;
   }
-  if (!currentRoles.includes("buyer")) {currentRoles.push("buyer");}
+  if (!currentRoles.includes("buyer")) { currentRoles.push("buyer"); }
   foundUser.roles = [...new Set(currentRoles)];
   foundUser.shop = shop._id;
   await foundUser.save();
@@ -231,8 +231,8 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
     if (!email || !password || !confirmPassword || !firstName || !phone) {
       throw new AppError("email, password, confirmPassword, firstName, and phone are required for guest", 400);
     }
-    if (password !== confirmPassword) {throw new AppError("Passwords must match", 400);}
-    if (password.length < 6) {throw new AppError("Password must be at least 6 characters", 400);}
+    if (password !== confirmPassword) { throw new AppError("Passwords must match", 400); }
+    if (password.length < 6) { throw new AppError("Password must be at least 6 characters", 400); }
     const existingUser = await User.findOne({ email: String(email).toLowerCase().trim() });
     if (existingUser) {
       throw new AppError("User already exists. Please log in and use the cooperative signup flow.", 400);
@@ -289,21 +289,21 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   const category = (body.category || "").trim();
   const contactNumber = (body.contactNumber || "").trim() || undefined;
   const businessAddress = (body.businessAddress || "").trim() || undefined;
-  if (!name) {throw new AppError("Shop name is required", 400);}
-  if (!description) {throw new AppError("Shop description is required", 400);}
-  if (!category) {throw new AppError("Shop category is required", 400);}
+  if (!name) { throw new AppError("Shop name is required", 400); }
+  if (!description) { throw new AppError("Shop description is required", 400); }
+  if (!category) { throw new AppError("Shop category is required", 400); }
 
   const idDoc = Array.isArray(files.idDocument) ? files.idDocument[0] : files.idDocument;
   const proofRes = Array.isArray(files.proofOfResidence) ? files.proofOfResidence[0] : files.proofOfResidence;
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
-  if (!idDoc || !idDoc.buffer) {throw new AppError("ID document is required", 400);}
-  if (!proofRes || !proofRes.buffer) {throw new AppError("Proof of residence is required", 400);}
-  if (!businessCacFile || !businessCacFile.buffer) {throw new AppError("Business CAC is required", 400);}
-  if (!passportPhoto || !passportPhoto.buffer) {throw new AppError("Passport photograph is required", 400);}
+  if (!idDoc || !idDoc.buffer) { throw new AppError("ID document is required", 400); }
+  if (!proofRes || !proofRes.buffer) { throw new AppError("Proof of residence is required", 400); }
+  if (!businessCacFile || !businessCacFile.buffer) { throw new AppError("Business CAC is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
 
   const foundUser = await User.findById(userId);
-  if (!foundUser) {throw new AppError("User not found", 404);}
+  if (!foundUser) { throw new AppError("User not found", 404); }
 
   const folderDocs = "daw/seller-documents";
   const folderShop = "daw/shops";
@@ -348,11 +348,11 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
     status: "active"
   };
   const shop = await marketplaceService.createShop(shopData);
-  if (!shop) {throw new AppError("Shop not created", 400);}
+  if (!shop) { throw new AppError("Shop not created", 400); }
 
   const currentRoles = Array.isArray(foundUser.roles) ? foundUser.roles : [];
-  if (!currentRoles.includes("seller")) {currentRoles.push("seller");}
-  if (!currentRoles.includes("buyer")) {currentRoles.push("buyer");}
+  if (!currentRoles.includes("seller")) { currentRoles.push("seller"); }
+  if (!currentRoles.includes("buyer")) { currentRoles.push("buyer"); }
   foundUser.roles = [...new Set(currentRoles)];
   foundUser.shop = shop._id;
   await foundUser.save();
@@ -405,8 +405,8 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
     if (!email || !password || !confirmPassword || !firstName || !phone) {
       throw new AppError("email, password, confirmPassword, firstName, and phone are required for guest", 400);
     }
-    if (password !== confirmPassword) {throw new AppError("Passwords must match", 400);}
-    if (password.length < 6) {throw new AppError("Password must be at least 6 characters", 400);}
+    if (password !== confirmPassword) { throw new AppError("Passwords must match", 400); }
+    if (password.length < 6) { throw new AppError("Password must be at least 6 characters", 400); }
     const existingUser = await User.findOne({ email: String(email).toLowerCase().trim() });
     if (existingUser) {
       throw new AppError("User already exists. Please log in and use the cooperative signup flow.", 400);
@@ -463,21 +463,21 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
   const category = (body.category || "").trim();
   const contactNumber = (body.contactNumber || "").trim() || undefined;
   const businessAddress = (body.businessAddress || "").trim() || undefined;
-  if (!name) {throw new AppError("Shop name is required", 400);}
-  if (!description) {throw new AppError("Shop description is required", 400);}
-  if (!category) {throw new AppError("Shop category is required", 400);}
+  if (!name) { throw new AppError("Shop name is required", 400); }
+  if (!description) { throw new AppError("Shop description is required", 400); }
+  if (!category) { throw new AppError("Shop category is required", 400); }
 
   const idDoc = Array.isArray(files.idDocument) ? files.idDocument[0] : files.idDocument;
   const proofRes = Array.isArray(files.proofOfResidence) ? files.proofOfResidence[0] : files.proofOfResidence;
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
-  if (!idDoc || !idDoc.buffer) {throw new AppError("ID document is required", 400);}
-  if (!proofRes || !proofRes.buffer) {throw new AppError("Proof of residence is required", 400);}
-  if (!businessCacFile || !businessCacFile.buffer) {throw new AppError("Business CAC is required", 400);}
-  if (!passportPhoto || !passportPhoto.buffer) {throw new AppError("Passport photograph is required", 400);}
+  if (!idDoc || !idDoc.buffer) { throw new AppError("ID document is required", 400); }
+  if (!proofRes || !proofRes.buffer) { throw new AppError("Proof of residence is required", 400); }
+  if (!businessCacFile || !businessCacFile.buffer) { throw new AppError("Business CAC is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
 
   const foundUser = await User.findById(userId);
-  if (!foundUser) {throw new AppError("User not found", 404);}
+  if (!foundUser) { throw new AppError("User not found", 404); }
 
   const folderDocs = "daw/seller-documents";
   const folderShop = "daw/shops";
@@ -522,11 +522,11 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
     status: "active"
   };
   const shop = await marketplaceService.createShop(shopData);
-  if (!shop) {throw new AppError("Shop not created", 400);}
+  if (!shop) { throw new AppError("Shop not created", 400); }
 
   const currentRoles = Array.isArray(foundUser.roles) ? foundUser.roles : [];
-  if (!currentRoles.includes("seller")) {currentRoles.push("seller");}
-  if (!currentRoles.includes("buyer")) {currentRoles.push("buyer");}
+  if (!currentRoles.includes("seller")) { currentRoles.push("seller"); }
+  if (!currentRoles.includes("buyer")) { currentRoles.push("buyer"); }
   foundUser.roles = [...new Set(currentRoles)];
   foundUser.shop = shop._id;
   await foundUser.save();
@@ -579,7 +579,7 @@ const getShops = asyncHandler(async (req, res) => {
 const getShopById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const shop = await marketplaceService.getShopById(id);
-  if (!shop) {return res.status(404).json({ message: "Shop not found" });}
+  if (!shop) { return res.status(404).json({ message: "Shop not found" }); }
   return res.status(200).json({ success: true, shop });
 });
 
@@ -710,16 +710,16 @@ const editProduct = asyncHandler(async (req, res) => {
 
   // Build updates object — only include fields that were sent
   const updates = {};
-  if (name !== undefined) {updates.name = name;}
-  if (quantity !== undefined) {updates.quantity = Number(quantity);}
-  if (price !== undefined) {updates.price = Number(price);}
-  if (category !== undefined) {updates.category = category;}
-  if (description !== undefined) {updates.description = description;}
-  if (status !== undefined) {updates.status = status;}
-  if (parsedVariants !== undefined) {updates.variants = parsedVariants;}
-  if (productFeatures !== undefined) {updates.productFeatures = productFeatures;}
-  if (careInstruction !== undefined) {updates.careInstruction = careInstruction;}
-  if (returnPolicy !== undefined) {updates.returnPolicy = returnPolicy;}
+  if (name !== undefined) { updates.name = name; }
+  if (quantity !== undefined) { updates.quantity = Number(quantity); }
+  if (price !== undefined) { updates.price = Number(price); }
+  if (category !== undefined) { updates.category = category; }
+  if (description !== undefined) { updates.description = description; }
+  if (status !== undefined) { updates.status = status; }
+  if (parsedVariants !== undefined) { updates.variants = parsedVariants; }
+  if (productFeatures !== undefined) { updates.productFeatures = productFeatures; }
+  if (careInstruction !== undefined) { updates.careInstruction = careInstruction; }
+  if (returnPolicy !== undefined) { updates.returnPolicy = returnPolicy; }
 
   // Merge existing images (kept) with newly uploaded ones
   if (parsedExistingImages !== undefined || newImageUrls.length > 0) {
@@ -844,7 +844,7 @@ const getAllProduct = asyncHandler(async (req, res) => {
 
 const getOrdersByShop = asyncHandler(async (req, res) => {
   const { shop_id } = req.params;
-   
+
   const shop = await Shop.findById(shop_id);
 
   if (!shop) {
@@ -899,7 +899,7 @@ const getSellerDetails = asyncHandler(async (req, res) => {
   const userDetails = await User.findById(shopDetails.owner_id)
     .select(
       "firstName lastName email phone accountName accountNo bankCode bankName accountId"
-    ); 
+    );
 
   if (!userDetails) {
     throw new AppError("Seller does not exist", 404);
@@ -999,6 +999,57 @@ const getShopStats = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, viewCount });
 });
 
+// Update order status (seller/admin)
+const updateOrderStatus = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+
+  if (!orderId || !status) {
+    throw new AppError("Order ID and status are required", 400);
+  }
+
+  const order = await Order.findById(orderId);
+  if (!order) {
+    throw new AppError("Order not found", 404);
+  }
+
+  const oldStatus = order.status;
+  order.status = status;
+
+  // Business logic: When order is delivered, release funds to seller's available balance
+  if (status === "delivered" && oldStatus !== "delivered") {
+    const shop = await Shop.findById(order.shop_id);
+    if (!shop) {
+      throw new AppError("Shop not found for this order", 404);
+    }
+
+    const seller = await User.findById(shop.owner_id);
+    if (!seller) {
+      throw new AppError("Seller not found", 404);
+    }
+
+    // Move funds from pending to account_Balance (Available)
+    // seller.pending_amount should have been increased by verifyPayment
+    const amountToTransfer = order.total_amount;
+
+    seller.pending_amount = Math.max(0, (seller.pending_amount || 0) - amountToTransfer);
+    seller.account_Balance = (seller.account_Balance || 0) + amountToTransfer;
+
+    order.escrow_status = "released";
+
+    await seller.save();
+    console.log(`Funds released for order ${orderId}: ${amountToTransfer} moved to seller ${seller._id} available balance.`);
+  }
+
+  await order.save();
+
+  res.status(200).json({
+    success: true,
+    message: `Order status updated to ${status}`,
+    order
+  });
+});
+
 module.exports = {
   createShop,
   sellerOnboard,
@@ -1021,5 +1072,6 @@ module.exports = {
   getSellerDetails,
   editShops,
   trackShopView,
-  getShopStats
+  getShopStats,
+  updateOrderStatus
 };
