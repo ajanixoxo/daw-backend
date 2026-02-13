@@ -18,19 +18,19 @@ module.exports = {
   async joinCooperative({ userId, cooperativeId, subscriptionTierId }) {
     // Validate cooperative and tier exist
     const coop = await Cooperative.findById(cooperativeId);
-    if (!coop) throw new Error("Cooperative not found");
+    if (!coop) {throw new Error("Cooperative not found");}
 
     const tier = await SubscriptionTier.findById(subscriptionTierId);
-    if (!tier) throw new Error("Subscription tier not found");
+    if (!tier) {throw new Error("Subscription tier not found");}
     // Guard: tier must belong to the cooperative being joined (backend cannot trust frontend)
     if (String(tier.cooperativeId) !== String(cooperativeId)) {
       throw new Error("Subscription tier does not belong to this cooperative");
     }
-    if (tier.isActive === false) throw new Error("Subscription tier is not active");
+    if (tier.isActive === false) {throw new Error("Subscription tier is not active");}
 
     // Guard: prevent duplicate cooperative membership (idempotent — second join returns error)
     const existingMember = await Member.findOne({ userId, cooperativeId });
-    if (existingMember) throw new Error("User is already a member of this cooperative");
+    if (existingMember) {throw new Error("User is already a member of this cooperative");}
 
     let member;
     try {
@@ -44,7 +44,7 @@ module.exports = {
       });
     } catch (err) {
       // DB unique index (userId, cooperativeId) race safety: treat duplicate key as already member
-      if (err.code === 11000) throw new Error("User is already a member of this cooperative");
+      if (err.code === 11000) {throw new Error("User is already a member of this cooperative");}
       throw err;
     }
 
@@ -69,7 +69,7 @@ module.exports = {
         description: "",
         category: "general",
         is_member_shop: true,
-        status: "active",
+        status: "active"
       });
       const u = await User.findById(userId);
       if (u) {

@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const variantSchema = new mongoose.Schema(
   {
     type: { type: String, required: true, trim: true },
-    values: [{ type: String, trim: true }],
+    values: [{ type: String, trim: true }]
   },
   { _id: false }
 );
@@ -12,7 +12,7 @@ const productSchema = new mongoose.Schema({
   shop_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Shop",
-    required: true,
+    required: true
   },
   name: { type: String, required: true, trim: true },
   description: String,
@@ -27,8 +27,8 @@ const productSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ["available", "unavailable", "draft", "out_of_stock"],
-    default: "available",
-  },
+    default: "available"
+  }
 }, { timestamps: true });
 
 const Product = mongoose.model("Product", productSchema);

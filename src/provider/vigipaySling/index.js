@@ -26,7 +26,7 @@ exports.createPayment = async (req, res) => {
       address,
       DeliveryAddress,
       zipCode,
-      logisticsInfo,
+      logisticsInfo
     } = req.body;
 
     if (!orderId) {
@@ -36,7 +36,7 @@ exports.createPayment = async (req, res) => {
     const order = await Order.findOne({
       _id: orderId,
       buyer_id: req.user._id,
-      payment_status: "unpaid",
+      payment_status: "unpaid"
     });
 
     if (!order) {
@@ -53,7 +53,7 @@ exports.createPayment = async (req, res) => {
       customerEmail: email || user.email,
       customerMobile: phone || user.phone,
       returnUrl: `${process.env.FRONTEND_URL}/payment/success`,
-      integrationKey: process.env.VIGIPAY_INTEGRATION_KEY,
+      integrationKey: process.env.VIGIPAY_INTEGRATION_KEY
     };
 
     const response = await axios.post(
@@ -94,14 +94,14 @@ exports.createPayment = async (req, res) => {
       zipCode,
       logisticsInfo,
 
-      rawResponse: data,
+      rawResponse: data
     });
 
     return res.status(200).json({
       status: true,
       paymentId: payment._id,
       reference: data.transactionReference,
-      redirectUrl: data.redirectUrl,
+      redirectUrl: data.redirectUrl
     });
   } catch (err) {
     console.error("Create payment error:", err);

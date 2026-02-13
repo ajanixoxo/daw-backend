@@ -10,7 +10,7 @@ const Cooperative = require("../models/cooperativeModel/cooperative.model.js");
 module.exports = {
   async createTier(data) {
     const coop = await Cooperative.findById(data.cooperativeId);
-    if (!coop) throw new Error("Cooperative not found");
+    if (!coop) {throw new Error("Cooperative not found");}
     const tier = await SubscriptionTier.create(data);
     // attach to cooperative
     coop.subscriptionTiers = coop.subscriptionTiers || [];

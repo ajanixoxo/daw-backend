@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Stock = require("@models/marketPlace/stockModel.js");
 const Wishlist = require("@models/marketPlace/wishlistModel.js");
 const Review = require("@models/marketPlace/reviewModel.js");
@@ -6,7 +6,7 @@ const Cart = require("@models/marketPlace/cartModel.js");
 const CartItem = require("@models/marketPlace/cartItemModel.js");
 const Product = require("@models/marketPlace/productModel.js");
 const Order = require("@models/marketPlace/orderModel.js");
-const AppError = require('@utils/Error/AppError.js');
+const AppError = require("@utils/Error/AppError.js");
 
 
 const getStockByProduct = async (product_id) => {
@@ -14,7 +14,7 @@ const getStockByProduct = async (product_id) => {
     throw new AppError("Invalid product ID", 400);
   }
 
-  const product = await Product.findById(product_id).select('quantity name');
+  const product = await Product.findById(product_id).select("quantity name");
   
   if (!product) {
     throw new AppError("Product not found", 404);
@@ -80,8 +80,8 @@ const addToWishlist = async (user_id, product_id) => {
 
   return await Wishlist.findById(wishlistItem._id)
     .populate({
-      path: 'product_id',
-      select: 'name price image_url quantity category'
+      path: "product_id",
+      select: "name price image_url quantity category"
     });
 };
 
@@ -103,11 +103,11 @@ const removeFromWishlist = async (user_id, product_id) => {
 const getWishlist = async (user_id) => {
   const wishlist = await Wishlist.find({ user_id })
     .populate({
-      path: 'product_id',
-      select: 'name description price image_url quantity category shop_id',
+      path: "product_id",
+      select: "name description price image_url quantity category shop_id",
       populate: {
-        path: 'shop_id',
-        select: 'name'
+        path: "shop_id",
+        select: "name"
       }
     })
     .sort({ added_at: -1 })
@@ -147,8 +147,8 @@ const addReview = async (user_id, product_id, rating, comment) => {
 
   const hasPurchased = await Order.exists({
     buyer_id: user_id,
-    'items.product_id': product_id,
-    status: { $in: ['delivered', 'completed'] }
+    "items.product_id": product_id,
+    status: { $in: ["delivered", "completed"] }
   });
 
   const existingReview = await Review.findOne({ user_id, product_id });
@@ -167,7 +167,7 @@ const addReview = async (user_id, product_id, rating, comment) => {
   await updateProductRating(product_id);
 
   return await Review.findById(review._id)
-    .populate('user_id', 'firstName lastName avatar')
+    .populate("user_id", "firstName lastName avatar")
     .lean();
 };
 
@@ -176,12 +176,12 @@ const getReviews = async (product_id, options = {}) => {
     throw new AppError("Invalid product ID", 400);
   }
 
-  const { page = 1, limit = 10, sort = '-createdAt' } = options;
+  const { page = 1, limit = 10, sort = "-createdAt" } = options;
   const skip = (page - 1) * limit;
 
   const [reviews, total] = await Promise.all([
     Review.find({ product_id })
-      .populate('user_id', 'firstName lastName avatar')
+      .populate("user_id", "firstName lastName avatar")
       .sort(sort)
       .skip(skip)
       .limit(limit)
@@ -193,7 +193,7 @@ const getReviews = async (product_id, options = {}) => {
     { $match: { product_id: new mongoose.Types.ObjectId(product_id) } },
     {
       $group: {
-        _id: '$rating',
+        _id: "$rating",
         count: { $sum: 1 }
       }
     }
@@ -223,7 +223,7 @@ const updateProductRating = async (product_id) => {
     {
       $group: {
         _id: null,
-        avgRating: { $avg: '$rating' },
+        avgRating: { $avg: "$rating" },
         totalReviews: { $sum: 1 }
       }
     }
@@ -301,8 +301,8 @@ const addItemToCart = async (user_id, product_id, quantity) => {
 
   return await CartItem.findById(cartItem._id)
     .populate({
-      path: 'product_id',
-      select: 'name price image_url quantity category shop_id'
+      path: "product_id",
+      select: "name price image_url quantity category shop_id"
     })
     .lean();
 };
@@ -313,7 +313,7 @@ const updateCartItemQuantity = async (cart_item_id, quantity, user_id) => {
   }
 
   const cartItem = await CartItem.findById(cart_item_id)
-    .populate('cart_id');
+    .populate("cart_id");
 
   if (!cartItem) {
     throw new AppError("Cart item not found", 404);
@@ -333,13 +333,13 @@ const updateCartItemQuantity = async (cart_item_id, quantity, user_id) => {
   await cartItem.save();
 
   return await CartItem.findById(cartItem._id)
-    .populate('product_id')
+    .populate("product_id")
     .lean();
 };
 
 const removeItemFromCart = async (cart_item_id, user_id) => {
   const cartItem = await CartItem.findById(cart_item_id)
-    .populate('cart_id');
+    .populate("cart_id");
 
   if (!cartItem) {
     throw new AppError("Cart item not found", 404);
@@ -355,7 +355,7 @@ const removeItemFromCart = async (cart_item_id, user_id) => {
 
 
 const getCartItems = async (user_id) => {
-  let cart = await Cart.findOne({ user_id });
+  const cart = await Cart.findOne({ user_id });
   
   if (!cart) {
     return {
@@ -367,11 +367,11 @@ const getCartItems = async (user_id) => {
 
   const items = await CartItem.find({ cart_id: cart._id })
     .populate({
-      path: 'product_id',
-      select: 'name description price image_url quantity category shop_id',
+      path: "product_id",
+      select: "name description price image_url quantity category shop_id",
       populate: {
-        path: 'shop_id',
-        select: 'name'
+        path: "shop_id",
+        select: "name"
       }
     })
     .lean();
@@ -429,7 +429,7 @@ const validateCart = async (user_id) => {
         product_name: item.product.name,
         requested: item.quantity,
         available: item.max_available,
-        issue: 'insufficient_stock'
+        issue: "insufficient_stock"
       });
     }
   }
