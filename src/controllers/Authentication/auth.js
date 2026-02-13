@@ -8,6 +8,7 @@ const {
   loginOTPEmailTemplate,
   forgotPasswordOTPEmailTemplate
 } = require("@utils/EmailTemplate/template.js");
+const { uploadBuffer } = require("@utils/cloudinary/cloudinary.js");
 const jwt = require("jsonwebtoken");
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -479,28 +480,43 @@ const getUserProfile = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Find all memberships for this user
-    const memberships = await Member.find({ userId }).select("_id cooperativeId status joinDate monthlyContribution subscriptionTierId");
+    // Implement user-specific cooperative check logic
+    const roles = User.roles;
+    let isMember = false;
+
+    // Check last role or length
+    if (roles && roles.length > 0) {
+        const lastRole = roles[roles.length - 1];
+        if (lastRole === "member" || lastRole === "cooperative" || roles.length === 3) {
+            isMember = true;
+        }
+    }
+
+    // Initialize member array
+    const userObject = User.toObject();
+    userObject.member = [];
+
+    // If deemed a member, query the Member collection
+    if (isMember) {
+        const membership = await Member.findOne({ userId })
+            .populate("cooperativeId", "name"); // Get name directly here
+        
+        if (membership) {
+            userObject.member = [{
+                memberId: membership._id,
+                cooperativeId: membership.cooperativeId, // This is the populated object with name
+                status: membership.status,
+                joinDate: membership.joinDate,
+                monthlyContribution: membership.monthlyContribution,
+                subscriptionTierId: membership.subscriptionTierId
+            }];
+        }
+    }
 
     // Find all shops owned by this user
-    const shops = await Shop.find({ owner_id: userId }).select("_id name description category logo_url banner_url is_member_shop status cooperative_id");
-
-    // Convert user to object and add member information
-    const userObject = User.toObject();
-    
-    // Add member information if user has joined any cooperative
-    if (memberships && memberships.length > 0) {
-      userObject.member = memberships.map(membership => ({
-        memberId: membership._id,
-        cooperativeId: membership.cooperativeId,
-        status: membership.status,
-        joinDate: membership.joinDate,
-        monthlyContribution: membership.monthlyContribution,
-        subscriptionTierId: membership.subscriptionTierId
-      }));
-    } else {
-      userObject.member = [];
-    }
+    const shops = await Shop.find({ owner_id: userId })
+      .select("_id name description category logo_url banner_url is_member_shop status cooperative_id")
+      .populate("cooperative_id", "name");
 
     // Add shop information if user owns any shops
     if (shops && shops.length > 0) {
@@ -526,6 +542,88 @@ const getUserProfile = asyncHandler(async (req, res) => {
   }
 });
 
+const updateUserProfile = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { firstName, lastName, phone } = req.body;
+    
+    const User = await user.findById(userId);
+    if (!User) {
+      throw new AppError("User not found", 404);
+    }
+
+    if (firstName) User.firstName = firstName;
+    if (lastName) User.lastName = lastName;
+    if (phone) User.phone = phone;
+
+    // Handle profile picture upload
+    if (req.file) {
+      const folder = "daw/users/profiles";
+      const prefix = `user_${userId}`;
+      const result = await uploadBuffer(req.file.buffer, {
+        folder,
+        publicIdPrefix: `${prefix}_${Date.now()}`,
+      });
+      User.profilePicture = result.secure_url;
+    }
+
+    await User.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: {
+        _id: User._id,
+        firstName: User.firstName,
+        lastName: User.lastName,
+        email: User.email,
+        phone: User.phone,
+        profilePicture: User.profilePicture,
+        roles: User.roles,
+      },
+    });
+  } catch (error) {
+    console.error("Error updates user profile:", error);
+    throw new AppError(error.message || "Error updating profile", 500);
+  }
+});
+
+const changePassword = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { currentPassword, newPassword, confirmNewPassword } = req.body;
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      throw new AppError("All fields are required", 400);
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      throw new AppError("New passwords do not match", 400);
+    }
+
+    const User = await user.findById(userId).select("+password");
+    if (!User) {
+      throw new AppError("User not found", 404);
+    }
+
+    const isMatch = await User.comparePassword(currentPassword);
+    if (!isMatch) {
+      throw new AppError("Incorrect current password", 401);
+    }
+
+    User.password = newPassword;
+    await User.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    console.error("Error changing password:", error);
+    throw new AppError(error.message || "Error changing password", 500);
+  }
+});
+
 module.exports = {
   registerUser,
   verifyEmail,
@@ -536,5 +634,7 @@ module.exports = {
   logout,
   forgotPassword,
   resetPassword,
-  getUserProfile
+  getUserProfile,
+  updateUserProfile,
+  changePassword
 };
