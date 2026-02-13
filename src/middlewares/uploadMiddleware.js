@@ -77,7 +77,12 @@ const shopEditUpload = multer({
 ]);
 
 module.exports = {
+  shopEditUpload,
+  profileUpload: multer({
+    storage: memoryStorage,
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: imageFileFilter,
+  }).single("profilePicture"),
   sellerOnboardUpload,
   productImagesUpload,
-  shopEditUpload
 };

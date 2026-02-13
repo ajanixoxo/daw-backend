@@ -34,6 +34,10 @@ const UserSchema = new mongoose.Schema(
       match: [/.+\@.+\..+/, "Please fill a valid email address"]
     },
 
+    profilePicture: {
+      type: String,
+    },
+
     phone: {
       type: String,
       required: [true, "phone number is required"],

@@ -81,6 +81,25 @@ const getMember = async (req, res) => {
   }
 };
 
+const getDetails = async (req, res) => {
+  try {
+    const details = await MemberService.getDetails(req.params.id);
+    if (!details) return res.status(404).json({ error: "Member not found" });
+    return res.json(details);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+const removeMember = async (req, res) => {
+  try {
+    await MemberService.removeMember(req.params.id);
+    return res.json({ message: "Member removed successfully" });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
 /**
  * CASE 3: Guest joins cooperative.
  * No auth. If email already exists → require login (do not create duplicate user).
@@ -180,5 +199,7 @@ module.exports = {
   guestJoin,
   approve,
   listMembers,
-  getMember
+  getMember,
+  getDetails,
+  removeMember
 };

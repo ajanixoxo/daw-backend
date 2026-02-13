@@ -9,9 +9,13 @@ const {
   logout,
   forgotPassword,
   resetPassword,
-  getUserProfile
-} = require("@controllers/Authentication/auth.js");
+  getUserProfile,
+  updateUserProfile,
+  changePassword
+} = require('@controllers/Authentication/auth.js');
+
 const { protect } = require("@middlewares/authMiddleware.js");
+const { profileUpload } = require("@middlewares/uploadMiddleware.js");
 
 const router = express.Router();
 
@@ -33,6 +37,10 @@ router.post("/forgot/password", forgotPassword);
 
 router.post("/reset/password", protect, resetPassword);
 
-router.get("/profile", protect, getUserProfile);
+router.get('/profile', protect, getUserProfile);
+
+router.put('/profile', protect, profileUpload, updateUserProfile);
+
+router.put('/password', protect, changePassword);
 
 module.exports = router;
