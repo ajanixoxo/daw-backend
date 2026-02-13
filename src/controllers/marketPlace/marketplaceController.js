@@ -373,6 +373,17 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   });
 
   const isGuest = !req.user || !req.user._id;
+
+  // For logged-in users, return the updated user so frontend can sync roles
+  let updatedUser = null;
+  if (!isGuest) {
+    updatedUser = await User.findById(userId)
+      .select("firstName lastName email phone roles isVerified status shop member avatar")
+      .populate("shop", "_id name")
+      .populate("member", "_id cooperativeId")
+      .lean();
+  }
+
   res.status(201).json({
     success: true,
     message: isGuest
@@ -381,7 +392,7 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
     member,
     shop: { _id: shop._id, name: shop.name, status: shop.status },
     sellerDocuments: { _id: sellerDoc._id, status: sellerDoc.status },
-    ...(isGuest ? { token: guestTempToken, user: guestUser } : {}),
+    ...(isGuest ? { token: guestTempToken, user: guestUser } : { user: updatedUser }),
   });
 });
 
@@ -840,16 +851,9 @@ const getOrdersByShop = asyncHandler(async (req, res) => {
   }
   const orders = await marketplaceService.getOrdersByShopId(shop_id);
 
-  if (!orders || orders.length === 0) {
-    return res.status(404).json({
-      success: false,
-      message: "No orders found for this shop",
-    });
-  }
-
   res.status(200).json({
     success: true,
-    orders,
+    orders: orders || [],
   });
 });
 
