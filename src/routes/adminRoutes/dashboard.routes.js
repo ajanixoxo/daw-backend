@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { getDashboardStats, getPendingCooperatives, getAllUsers, getAnalyticsData } = require("../../controllers/admin/dashboard.controller.js");
+const { getDashboardStats, getPendingCooperatives, getAllUsers, getAnalyticsData, getUserAnalytics, getCooperativeAnalytics, getRevenueAnalytics } = require("../../controllers/admin/dashboard.controller.js");
 const asyncHandler = require("express-async-handler");
 
 
@@ -17,5 +17,14 @@ router.get("/users", getAllUsers);
 
 // GET /api/admin/analytics
 router.get("/analytics", getAnalyticsData);
+
+// GET /api/admin/analytics/users
+router.get("/analytics/users", getUserAnalytics);
+
+// GET /api/admin/analytics/cooperatives
+router.get("/analytics/cooperatives", getCooperativeAnalytics);
+
+// GET /api/admin/analytics/revenue
+router.get("/analytics/revenue", getRevenueAnalytics);
 
 module.exports = router;
