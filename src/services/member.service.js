@@ -56,7 +56,12 @@ module.exports = {
     // Shop creation ONLY if user does not already have one (CASE 1: seller → skip; CASE 2: buyer → create)
     // Reuse marketplace createShop so one-shop-per-user is enforced in one place.
     const existingShop = await Shop.findOne({ owner_id: userId });
-    if (!existingShop) {
+    if (existingShop) {
+      // Existing seller joining cooperative — upgrade their shop to member shop
+      existingShop.is_member_shop = true;
+      existingShop.cooperative_id = cooperativeId;
+      await existingShop.save();
+    } else {
       const newShop = await marketplaceService.createShop({
         owner_id: userId,
         cooperative_id: cooperativeId,
