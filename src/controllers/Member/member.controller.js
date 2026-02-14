@@ -42,9 +42,8 @@ const join = async (req, res) => {
     // Return updated user so the frontend can sync roles in localStorage
     const updatedUser = await require("../../models/userModel/user.js")
       .findById(userId)
-      .select("firstName lastName email phone roles isVerified status shop member avatar")
+      .select("firstName lastName email phone roles isVerified status shop avatar")
       .populate("shop", "_id name")
-      .populate("member", "_id cooperativeId")
       .lean();
 
     return res.status(201).json({ message: "Joined", member, user: updatedUser });

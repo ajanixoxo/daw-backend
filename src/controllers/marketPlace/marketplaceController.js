@@ -77,7 +77,8 @@ const createShop = asyncHandler(async (req, res) => {
  * Seller onboarding (non-cooperative): shop info + document uploads.
  * POST /marketplace/seller-onboard (multipart/form-data)
  * Body: name (or shopName), description, category, contactNumber?, businessAddress?
- * Files: shopLogo?, shopBanner?, idDocument, proofOfResidence, businessCac, passportPhotograph
+ * Files: shopLogo?, shopBanner?, passportPhotograph, businessCac?
+ * Body also includes: nin (required)
  */
 const sellerOnboard = asyncHandler(async (req, res) => {
   if (!req.user || !req.user._id) {
@@ -96,14 +97,11 @@ const sellerOnboard = asyncHandler(async (req, res) => {
   if (!description) { throw new AppError("Shop description is required", 400); }
   if (!category) { throw new AppError("Shop category is required", 400); }
 
-  const idDoc = Array.isArray(files.idDocument) ? files.idDocument[0] : files.idDocument;
-  const proofRes = Array.isArray(files.proofOfResidence) ? files.proofOfResidence[0] : files.proofOfResidence;
+  const nin = (body.nin || "").trim();
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
 
-  if (!idDoc || !idDoc.buffer) { throw new AppError("ID document is required", 400); }
-  if (!proofRes || !proofRes.buffer) { throw new AppError("Proof of residence is required", 400); }
-  if (!businessCacFile || !businessCacFile.buffer) { throw new AppError("Business CAC is required", 400); }
+  if (!nin) { throw new AppError("NIN is required", 400); }
   if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
 
   const owner_id = req.user._id;
@@ -114,12 +112,15 @@ const sellerOnboard = asyncHandler(async (req, res) => {
   const folderShop = "daw/shops";
   const prefix = `seller_${owner_id.toString()}`;
 
-  const [idDocResult, proofResResult, cacResult, passportResult] = await Promise.all([
-    uploadBuffer(idDoc.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_id` }),
-    uploadBuffer(proofRes.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_proof` }),
-    uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }),
+  const uploadPromises = [
     uploadBuffer(passportPhoto.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_passport` })
-  ]);
+  ];
+  if (businessCacFile && businessCacFile.buffer) {
+    uploadPromises.push(uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }));
+  }
+  const uploadResults = await Promise.all(uploadPromises);
+  const passportResult = uploadResults[0];
+  const cacResult = uploadResults[1] || null;
 
   let logo_url = null;
   let banner_url = null;
@@ -171,10 +172,9 @@ const sellerOnboard = asyncHandler(async (req, res) => {
 
   const sellerDoc = await SellerDocuments.create({
     user_id: owner_id,
-    id_document_url: idDocResult.secure_url,
-    proof_of_residence_url: proofResResult.secure_url,
-    business_cac_url: cacResult.secure_url,
+    nin,
     passport_photograph_url: passportResult.secure_url,
+    business_cac_url: cacResult ? cacResult.secure_url : null,
     status: "pending"
   });
 
@@ -184,10 +184,14 @@ const sellerOnboard = asyncHandler(async (req, res) => {
     sellerDocuments: {
       _id: sellerDoc._id,
       status: sellerDoc.status,
-      id_document_url: sellerDoc.id_document_url,
-      proof_of_residence_url: sellerDoc.proof_of_residence_url,
-      business_cac_url: sellerDoc.business_cac_url,
-      passport_photograph_url: sellerDoc.passport_photograph_url
+      nin: sellerDoc.nin,
+      passport_photograph_url: sellerDoc.passport_photograph_url,
+      business_cac_url: sellerDoc.business_cac_url
+    },
+    user: {
+      _id: foundUser._id,
+      roles: foundUser.roles,
+      shop: foundUser.shop
     }
   });
 });
@@ -217,13 +221,13 @@ const getMySellerDocuments = asyncHandler(async (req, res) => {
  * Optional auth: if no token, treat as guest (require firstName, lastName, email, phone, password, confirmPassword).
  * Body: firstName?, lastName?, email?, phone?, password?, confirmPassword? (guest);
  *       name|shopName, description, category, contactNumber?, businessAddress?, cooperativeId, subscriptionTierId
- * Files: shopLogo?, shopBanner?, idDocument, proofOfResidence, businessCac, passportPhotograph
+ * Files: shopLogo?, shopBanner?, passportPhotograph, businessCac?
+ * Body also includes: nin (required)
  */
 const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   const body = req.body || {};
   const files = req.files || {};
   let userId;
-  let guestUser = null;
   let guestTempToken = null;
 
   if (!req.user || !req.user._id) {
@@ -261,15 +265,6 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
       JWT_SECRET,
       { expiresIn: "15min" }
     );
-    guestUser = {
-      _id: newUser._id,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
-      email: newUser.email,
-      phone: newUser.phone,
-      verified: newUser.isVerified,
-      roles: newUser.roles
-    };
     userId = newUser._id;
   } else {
     userId = req.user._id;
@@ -293,13 +288,10 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   if (!description) { throw new AppError("Shop description is required", 400); }
   if (!category) { throw new AppError("Shop category is required", 400); }
 
-  const idDoc = Array.isArray(files.idDocument) ? files.idDocument[0] : files.idDocument;
-  const proofRes = Array.isArray(files.proofOfResidence) ? files.proofOfResidence[0] : files.proofOfResidence;
+  const nin = (body.nin || "").trim();
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
-  if (!idDoc || !idDoc.buffer) { throw new AppError("ID document is required", 400); }
-  if (!proofRes || !proofRes.buffer) { throw new AppError("Proof of residence is required", 400); }
-  if (!businessCacFile || !businessCacFile.buffer) { throw new AppError("Business CAC is required", 400); }
+  if (!nin) { throw new AppError("NIN is required", 400); }
   if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
 
   const foundUser = await User.findById(userId);
@@ -308,12 +300,16 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   const folderDocs = "daw/seller-documents";
   const folderShop = "daw/shops";
   const prefix = `seller_${userId.toString()}`;
-  const [idDocResult, proofResResult, cacResult, passportResult] = await Promise.all([
-    uploadBuffer(idDoc.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_id` }),
-    uploadBuffer(proofRes.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_proof` }),
-    uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }),
+
+  const uploadPromises = [
     uploadBuffer(passportPhoto.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_passport` })
-  ]);
+  ];
+  if (businessCacFile && businessCacFile.buffer) {
+    uploadPromises.push(uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }));
+  }
+  const uploadResults = await Promise.all(uploadPromises);
+  const passportResult = uploadResults[0];
+  const cacResult = uploadResults[1] || null;
 
   let logo_url = null;
   let banner_url = null;
@@ -359,10 +355,9 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
 
   const sellerDoc = await SellerDocuments.create({
     user_id: userId,
-    id_document_url: idDocResult.secure_url,
-    proof_of_residence_url: proofResResult.secure_url,
-    business_cac_url: cacResult.secure_url,
+    nin,
     passport_photograph_url: passportResult.secure_url,
+    business_cac_url: cacResult ? cacResult.secure_url : null,
     status: "pending"
   });
 
@@ -374,15 +369,11 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
 
   const isGuest = !req.user || !req.user._id;
 
-  // For logged-in users, return the updated user so frontend can sync roles
-  let updatedUser = null;
-  if (!isGuest) {
-    updatedUser = await User.findById(userId)
-      .select("firstName lastName email phone roles isVerified status shop member avatar")
-      .populate("shop", "_id name")
-      .populate("member", "_id cooperativeId")
-      .lean();
-  }
+  // Fetch the updated user so frontend can sync roles
+  const updatedUser = await User.findById(userId)
+    .select("firstName lastName email phone roles isVerified status shop avatar")
+    .populate("shop", "_id name")
+    .lean();
 
   res.status(201).json({
     success: true,
@@ -392,7 +383,8 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
     member,
     shop: { _id: shop._id, name: shop.name, status: shop.status },
     sellerDocuments: { _id: sellerDoc._id, status: sellerDoc.status },
-    ...(isGuest ? { token: guestTempToken, user: guestUser } : { user: updatedUser }),
+    ...(isGuest ? { token: guestTempToken } : {}),
+    user: updatedUser,
   });
 });
 
@@ -402,13 +394,13 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
  * Optional auth: if no token, treat as guest (require firstName, lastName, email, phone, password, confirmPassword).
  * Body: firstName?, lastName?, email?, phone?, password?, confirmPassword? (guest);
  *       name|shopName, description, category, contactNumber?, businessAddress?
- * Files: shopLogo?, shopBanner?, idDocument, proofOfResidence, businessCac, passportPhotograph
+ * Files: shopLogo?, shopBanner?, passportPhotograph, businessCac?
+ * Body also includes: nin (required)
  */
 const guestSellerOnboard = asyncHandler(async (req, res) => {
   const body = req.body || {};
   const files = req.files || {};
   let userId;
-  let guestUser = null;
   let guestTempToken = null;
 
   if (!req.user || !req.user._id) {
@@ -446,27 +438,9 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
       JWT_SECRET,
       { expiresIn: "15min" }
     );
-    guestUser = {
-      _id: newUser._id,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
-      email: newUser.email,
-      phone: newUser.phone,
-      verified: newUser.isVerified,
-      roles: newUser.roles
-    };
     userId = newUser._id;
   } else {
     userId = req.user._id;
-  }
-
-  const cooperativeId = (body.cooperativeId || "").trim();
-  const subscriptionTierId = (body.subscriptionTierId || "").trim();
-  if (!cooperativeId || !mongoose.Types.ObjectId.isValid(cooperativeId)) {
-    throw new AppError("Valid cooperativeId is required", 400);
-  }
-  if (!subscriptionTierId || !mongoose.Types.ObjectId.isValid(subscriptionTierId)) {
-    throw new AppError("Valid subscriptionTierId is required", 400);
   }
 
   const name = (body.name || body.shopName || "").trim();
@@ -478,13 +452,10 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
   if (!description) { throw new AppError("Shop description is required", 400); }
   if (!category) { throw new AppError("Shop category is required", 400); }
 
-  const idDoc = Array.isArray(files.idDocument) ? files.idDocument[0] : files.idDocument;
-  const proofRes = Array.isArray(files.proofOfResidence) ? files.proofOfResidence[0] : files.proofOfResidence;
+  const nin = (body.nin || "").trim();
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
-  if (!idDoc || !idDoc.buffer) { throw new AppError("ID document is required", 400); }
-  if (!proofRes || !proofRes.buffer) { throw new AppError("Proof of residence is required", 400); }
-  if (!businessCacFile || !businessCacFile.buffer) { throw new AppError("Business CAC is required", 400); }
+  if (!nin) { throw new AppError("NIN is required", 400); }
   if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
 
   const foundUser = await User.findById(userId);
@@ -493,12 +464,16 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
   const folderDocs = "daw/seller-documents";
   const folderShop = "daw/shops";
   const prefix = `seller_${userId.toString()}`;
-  const [idDocResult, proofResResult, cacResult, passportResult] = await Promise.all([
-    uploadBuffer(idDoc.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_id` }),
-    uploadBuffer(proofRes.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_proof` }),
-    uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }),
+
+  const uploadPromises = [
     uploadBuffer(passportPhoto.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_passport` })
-  ]);
+  ];
+  if (businessCacFile && businessCacFile.buffer) {
+    uploadPromises.push(uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }));
+  }
+  const uploadResults = await Promise.all(uploadPromises);
+  const passportResult = uploadResults[0];
+  const cacResult = uploadResults[1] || null;
 
   let logo_url = null;
   let banner_url = null;
@@ -513,23 +488,22 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
     banner_url = r.secure_url;
   }
 
-  const coopStoreUrl = name
+  const storeUrl = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "") + "-" + Date.now();
 
   const shopData = {
     owner_id: userId,
-    cooperative_id: null,
     name,
-    store_url: coopStoreUrl,
+    store_url: storeUrl,
     description,
     category,
     contact_number: contactNumber,
     business_address: businessAddress,
     logo_url,
     banner_url,
-    is_member_shop: true,
+    is_member_shop: false,
     status: "active"
   };
   const shop = await marketplaceService.createShop(shopData);
@@ -544,29 +518,31 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
 
   const sellerDoc = await SellerDocuments.create({
     user_id: userId,
-    id_document_url: idDocResult.secure_url,
-    proof_of_residence_url: proofResResult.secure_url,
-    business_cac_url: cacResult.secure_url,
+    nin,
     passport_photograph_url: passportResult.secure_url,
+    business_cac_url: cacResult ? cacResult.secure_url : null,
     status: "pending"
   });
 
-  const member = await MemberService.joinCooperative({
-    userId,
-    cooperativeId,
-    subscriptionTierId
-  });
-
   const isGuest = !req.user || !req.user._id;
+  // Build user object with the UPDATED roles (after seller role was added)
+  const updatedUser = {
+    _id: foundUser._id,
+    firstName: foundUser.firstName,
+    lastName: foundUser.lastName,
+    email: foundUser.email,
+    phone: foundUser.phone,
+    roles: foundUser.roles,
+    shop: foundUser.shop
+  };
   res.status(201).json({
     success: true,
     message: isGuest
-      ? "Account created, seller onboarded, and joined cooperative. OTP sent to email for verification."
-      : "Seller onboarded and joined cooperative.",
-    member,
+      ? "Account created and seller onboarded. OTP sent to email for verification."
+      : "Seller onboarded successfully.",
     shop: { _id: shop._id, name: shop.name, status: shop.status },
     sellerDocuments: { _id: sellerDoc._id, status: sellerDoc.status },
-    ...(isGuest ? { token: guestTempToken, user: guestUser } : {})
+    ...(isGuest ? { token: guestTempToken, user: updatedUser } : { user: updatedUser })
   });
 });
 
@@ -576,7 +552,8 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
  * Optional auth: if no token, treat as guest (require firstName, lastName, email, phone, password, confirmPassword).
  * Body: firstName?, lastName?, email?, phone?, password?, confirmPassword? (guest);
  *       name|shopName, description, category, contactNumber?, businessAddress?
- * Files: shopLogo?, shopBanner?, idDocument, proofOfResidence, businessCac, passportPhotograph
+ * Files: shopLogo?, shopBanner?, passportPhotograph, businessCac?
+ * Body also includes: nin (required)
  */
 
 

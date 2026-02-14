@@ -7,10 +7,9 @@ const sellerDocumentsSchema = new mongoose.Schema(
       ref: "User",
       required: true
     },
-    id_document_url: { type: String, required: true },
-    proof_of_residence_url: { type: String, required: true },
-    business_cac_url: { type: String, required: true },
+    nin: { type: String, required: true },
     passport_photograph_url: { type: String, required: true },
+    business_cac_url: { type: String, default: null },
     status: {
       type: String,
       enum: ["pending", "verified", "rejected"],

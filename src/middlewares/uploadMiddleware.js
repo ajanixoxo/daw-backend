@@ -23,7 +23,7 @@ const fileFilter = (req, file, cb) => {
 
 /**
  * Multer config for seller onboarding (multipart form).
- * Fields: shopLogo, shopBanner, idDocument, proofOfResidence, businessCac, passportPhotograph
+ * Fields: shopLogo, shopBanner, businessCac, passportPhotograph
  * All optional for multer; controller validates required documents.
  */
 const sellerOnboardUpload = multer({
@@ -33,8 +33,6 @@ const sellerOnboardUpload = multer({
 }).fields([
   { name: "shopLogo", maxCount: 1 },
   { name: "shopBanner", maxCount: 1 },
-  { name: "idDocument", maxCount: 1 },
-  { name: "proofOfResidence", maxCount: 1 },
   { name: "businessCac", maxCount: 1 },
   { name: "passportPhotograph", maxCount: 1 }
 ]);
