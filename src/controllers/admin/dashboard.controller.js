@@ -164,22 +164,37 @@ const getAllUsers = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
 
-  // Search
+  // Build filter query
+  const conditions = [];
+
+  // Search by name, email, or phone
   const searchQuery = req.query.search;
-  let query = {};
   if (searchQuery) {
-    query = {
+    conditions.push({
       $or: [
         { firstName: { $regex: searchQuery, $options: "i" } },
         { lastName: { $regex: searchQuery, $options: "i" } },
-        { email: { $regex: searchQuery, $options: "i" } }
+        { email: { $regex: searchQuery, $options: "i" } },
+        { phone: { $regex: searchQuery, $options: "i" } }
       ]
-    };
+    });
   }
 
+  // Filter by role
+  if (req.query.role) {
+    conditions.push({ roles: req.query.role });
+  }
+
+  // Filter by status
+  if (req.query.status) {
+    conditions.push({ status: req.query.status });
+  }
+
+  const query = conditions.length > 0 ? { $and: conditions } : {};
+
   const users = await User.find(query)
-    .select("-password -otp -otpExpiry -otpExpires -pin") // Exclude sensitive fields
-    .populate("shop", "name description") // Optional: Populate shop if needed
+    .select("-password -otp -otpExpiry -otpExpires -pin")
+    .populate("shop", "name description")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
