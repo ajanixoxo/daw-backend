@@ -5,6 +5,9 @@ const Product = require("@models/marketPlace/productModel.js");
 const Cooperative = require("@models/cooperativeModel/cooperative.model.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const OrderItem = require("@models/marketPlace/orderItemModel.js");
+const Member = require("@models/memberModel/member.model.js");
+const Contribution = require("@models/contributionModel/contribution.model.js");
+const Payment = require("@models/paymentModel/payment.model.js");
 
 /**
  * Get Admin Dashboard Stats
@@ -161,22 +164,37 @@ const getAllUsers = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
   const skip = (page - 1) * limit;
 
-  // Search
+  // Build filter query
+  const conditions = [];
+
+  // Search by name, email, or phone
   const searchQuery = req.query.search;
-  let query = {};
   if (searchQuery) {
-    query = {
+    conditions.push({
       $or: [
         { firstName: { $regex: searchQuery, $options: "i" } },
         { lastName: { $regex: searchQuery, $options: "i" } },
-        { email: { $regex: searchQuery, $options: "i" } }
+        { email: { $regex: searchQuery, $options: "i" } },
+        { phone: { $regex: searchQuery, $options: "i" } }
       ]
-    };
+    });
   }
 
+  // Filter by role
+  if (req.query.role) {
+    conditions.push({ roles: req.query.role });
+  }
+
+  // Filter by status
+  if (req.query.status) {
+    conditions.push({ status: req.query.status });
+  }
+
+  const query = conditions.length > 0 ? { $and: conditions } : {};
+
   const users = await User.find(query)
-    .select("-password -otp -otpExpiry -otpExpires -pin") // Exclude sensitive fields
-    .populate("shop", "name description") // Optional: Populate shop if needed
+    .select("-password -otp -otpExpiry -otpExpires -pin")
+    .populate("shop", "name description")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
@@ -342,9 +360,347 @@ const getAnalyticsData = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Get User Analytics (Admin)
+ * GET /api/admin/analytics/users
+ */
+const getUserAnalytics = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  sixMonthsAgo.setDate(1);
+
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+  const [
+    totalUsers,
+    verifiedUsers,
+    unverifiedUsers,
+    thisMonthRegistrations,
+    lastMonthRegistrations,
+    roleBreakdown,
+    kycBreakdown,
+    registrationTrend,
+    statusBreakdown,
+    recentUsers
+  ] = await Promise.all([
+    User.countDocuments(),
+    User.countDocuments({ isVerified: true }),
+    User.countDocuments({ isVerified: false }),
+    User.countDocuments({ createdAt: { $gte: thisMonthStart } }),
+    User.countDocuments({ createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } }),
+    User.aggregate([
+      { $unwind: "$roles" },
+      { $group: { _id: "$roles", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]),
+    User.aggregate([
+      { $group: { _id: "$kyc_status", count: { $sum: 1 } } }
+    ]),
+    User.aggregate([
+      { $match: { createdAt: { $gte: sixMonthsAgo } } },
+      {
+        $group: {
+          _id: { month: { $month: "$createdAt" }, year: { $year: "$createdAt" } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]),
+    User.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]),
+    User.find()
+      .select("firstName lastName email roles status createdAt isVerified")
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean()
+  ]);
+
+  const growthRate = lastMonthRegistrations > 0
+    ? (((thisMonthRegistrations - lastMonthRegistrations) / lastMonthRegistrations) * 100).toFixed(1)
+    : thisMonthRegistrations > 0 ? 100 : 0;
+
+  res.status(200).json({
+    success: true,
+    data: {
+      summary: {
+        totalUsers,
+        verifiedUsers,
+        unverifiedUsers,
+        thisMonthRegistrations,
+        lastMonthRegistrations,
+        growthRate: Number(growthRate)
+      },
+      roleBreakdown,
+      kycBreakdown,
+      statusBreakdown,
+      registrationTrend,
+      recentUsers
+    }
+  });
+});
+
+/**
+ * Get Cooperative Analytics (Admin)
+ * GET /api/admin/analytics/cooperatives
+ */
+const getCooperativeAnalytics = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  sixMonthsAgo.setDate(1);
+
+  const [
+    totalCooperatives,
+    statusBreakdown,
+    totalMembers,
+    activeMembers,
+    coopGrowthTrend,
+    totalContributions,
+    contributionTrend,
+    loanStats,
+    topCoopsByContributions,
+    topCoopsByMembers
+  ] = await Promise.all([
+    Cooperative.countDocuments(),
+    Cooperative.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]),
+    Member.countDocuments(),
+    Member.countDocuments({ status: "active" }),
+    Cooperative.aggregate([
+      { $match: { createdAt: { $gte: sixMonthsAgo } } },
+      {
+        $group: {
+          _id: { month: { $month: "$createdAt" }, year: { $year: "$createdAt" } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]),
+    Contribution.aggregate([
+      { $match: { status: "paid" } },
+      { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } }
+    ]),
+    Contribution.aggregate([
+      { $match: { status: "paid", createdAt: { $gte: sixMonthsAgo } } },
+      {
+        $group: {
+          _id: { month: { $month: "$createdAt" }, year: { $year: "$createdAt" } },
+          total: { $sum: "$amount" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]),
+    Loan.aggregate([
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+          totalAmount: { $sum: "$amount" }
+        }
+      }
+    ]),
+    Contribution.aggregate([
+      { $match: { status: "paid" } },
+      { $group: { _id: "$cooperativeId", totalContributions: { $sum: "$amount" }, count: { $sum: 1 } } },
+      { $sort: { totalContributions: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: "cooperatives",
+          localField: "_id",
+          foreignField: "_id",
+          as: "cooperative"
+        }
+      },
+      { $unwind: "$cooperative" },
+      {
+        $project: {
+          name: "$cooperative.name",
+          logoUrl: "$cooperative.logoUrl",
+          status: "$cooperative.status",
+          totalContributions: 1,
+          count: 1
+        }
+      }
+    ]),
+    Cooperative.aggregate([
+      {
+        $project: {
+          name: 1,
+          logoUrl: 1,
+          status: 1,
+          memberCount: { $size: { $ifNull: ["$members", []] } }
+        }
+      },
+      { $sort: { memberCount: -1 } },
+      { $limit: 5 }
+    ])
+  ]);
+
+  const contributionTotal = totalContributions.length > 0 ? totalContributions[0].total : 0;
+  const contributionCount = totalContributions.length > 0 ? totalContributions[0].count : 0;
+  const avgMembersPerCoop = totalCooperatives > 0
+    ? Math.round(totalMembers / totalCooperatives)
+    : 0;
+
+  res.status(200).json({
+    success: true,
+    data: {
+      summary: {
+        totalCooperatives,
+        totalMembers,
+        activeMembers,
+        avgMembersPerCoop,
+        totalContributions: contributionTotal,
+        totalContributionCount: contributionCount
+      },
+      statusBreakdown,
+      coopGrowthTrend,
+      contributionTrend,
+      loanStats,
+      topCoopsByContributions,
+      topCoopsByMembers
+    }
+  });
+});
+
+/**
+ * Get Revenue Analytics (Admin)
+ * GET /api/admin/analytics/revenue
+ */
+const getRevenueAnalytics = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  sixMonthsAgo.setDate(1);
+
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+  const [
+    marketplaceRevenue,
+    thisMonthRevenue,
+    lastMonthRevenue,
+    revenueTrend,
+    contributionRevenue,
+    escrowBreakdown,
+    topShopsByRevenue,
+    orderStats,
+    paymentStats
+  ] = await Promise.all([
+    Order.aggregate([
+      { $match: { payment_status: "paid" } },
+      { $group: { _id: null, total: { $sum: "$total_amount" }, count: { $sum: 1 } } }
+    ]),
+    Order.aggregate([
+      { $match: { payment_status: "paid", createdAt: { $gte: thisMonthStart } } },
+      { $group: { _id: null, total: { $sum: "$total_amount" }, count: { $sum: 1 } } }
+    ]),
+    Order.aggregate([
+      { $match: { payment_status: "paid", createdAt: { $gte: lastMonthStart, $lte: lastMonthEnd } } },
+      { $group: { _id: null, total: { $sum: "$total_amount" }, count: { $sum: 1 } } }
+    ]),
+    Order.aggregate([
+      { $match: { payment_status: "paid", createdAt: { $gte: sixMonthsAgo } } },
+      {
+        $group: {
+          _id: { month: { $month: "$createdAt" }, year: { $year: "$createdAt" } },
+          total: { $sum: "$total_amount" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]),
+    Contribution.aggregate([
+      { $match: { status: "paid" } },
+      { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } }
+    ]),
+    Order.aggregate([
+      { $group: { _id: "$escrow_status", count: { $sum: 1 }, total: { $sum: "$total_amount" } } }
+    ]),
+    Order.aggregate([
+      { $match: { payment_status: "paid" } },
+      {
+        $group: {
+          _id: "$shop_id",
+          totalRevenue: { $sum: "$total_amount" },
+          orderCount: { $sum: 1 }
+        }
+      },
+      { $sort: { totalRevenue: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: "shops",
+          localField: "_id",
+          foreignField: "_id",
+          as: "shop"
+        }
+      },
+      { $unwind: "$shop" },
+      {
+        $project: {
+          name: "$shop.name",
+          logoUrl: "$shop.logoUrl",
+          totalRevenue: 1,
+          orderCount: 1
+        }
+      }
+    ]),
+    Order.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]),
+    Payment.aggregate([
+      { $group: { _id: "$vigipayStatus", count: { $sum: 1 }, total: { $sum: "$amount" } } }
+    ])
+  ]);
+
+  const totalMarketplace = marketplaceRevenue.length > 0 ? marketplaceRevenue[0].total : 0;
+  const totalOrders = marketplaceRevenue.length > 0 ? marketplaceRevenue[0].count : 0;
+  const thisMonthTotal = thisMonthRevenue.length > 0 ? thisMonthRevenue[0].total : 0;
+  const lastMonthTotal = lastMonthRevenue.length > 0 ? lastMonthRevenue[0].total : 0;
+  const totalContribRevenue = contributionRevenue.length > 0 ? contributionRevenue[0].total : 0;
+  const avgOrderValue = totalOrders > 0 ? Math.round(totalMarketplace / totalOrders) : 0;
+
+  const revenueGrowthRate = lastMonthTotal > 0
+    ? (((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100).toFixed(1)
+    : thisMonthTotal > 0 ? 100 : 0;
+
+  res.status(200).json({
+    success: true,
+    data: {
+      summary: {
+        totalMarketplaceRevenue: totalMarketplace,
+        totalContributionRevenue: totalContribRevenue,
+        totalCombinedRevenue: totalMarketplace + totalContribRevenue,
+        totalOrders,
+        avgOrderValue,
+        thisMonthRevenue: thisMonthTotal,
+        lastMonthRevenue: lastMonthTotal,
+        revenueGrowthRate: Number(revenueGrowthRate)
+      },
+      revenueTrend,
+      escrowBreakdown,
+      orderStats,
+      paymentStats,
+      topShopsByRevenue
+    }
+  });
+});
+
 module.exports = {
   getDashboardStats,
   getPendingCooperatives,
   getAllUsers,
-  getAnalyticsData
+  getAnalyticsData,
+  getUserAnalytics,
+  getCooperativeAnalytics,
+  getRevenueAnalytics
 };
