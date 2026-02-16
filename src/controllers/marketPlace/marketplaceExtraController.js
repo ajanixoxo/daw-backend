@@ -1,6 +1,6 @@
 const asyncHandler = require("express-async-handler");
 const marketplaceService = require("@services/marketPlace/marketPlaceExtraServices.js");
-const AppError = require('@utils/Error/AppError.js');
+const AppError = require("@utils/Error/AppError.js");
 
 const getStock = asyncHandler(async (req, res) => {
   const { product_id } = req.params;
@@ -91,7 +91,7 @@ const clearWishlist = asyncHandler(async (req, res) => {
   });
 });
 
-addReview = asyncHandler(async (req, res) => {
+const addReview = asyncHandler(async (req, res) => {
   const { product_id, rating, comment } = req.body;
   
   if (!product_id || !rating) {
@@ -120,7 +120,7 @@ const getReviews = asyncHandler(async (req, res) => {
   const result = await marketplaceService.getReviews(product_id, {
     page: parseInt(page) || 1,
     limit: parseInt(limit) || 10,
-    sort: sort || '-createdAt'
+    sort: sort || "-createdAt"
   });
   
   res.status(200).json({ 

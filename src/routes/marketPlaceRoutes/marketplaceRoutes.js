@@ -1,12 +1,12 @@
-const express = require('express');
+const express = require("express");
 const {
   protect,
   protectOptional,
-  restrictTo,
-} = require('@middlewares/authMiddleware.js');
-const marketplaceController = require('@controllers/marketPlace/marketplaceController.js');
-const categoryController = require('@controllers/marketPlace/categoryController.js');
-const { sellerOnboardUpload, productImagesUpload, shopEditUpload } = require('@middlewares/uploadMiddleware.js');
+  restrictTo
+} = require("@middlewares/authMiddleware.js");
+const marketplaceController = require("@controllers/marketPlace/marketplaceController.js");
+const categoryController = require("@controllers/marketPlace/categoryController.js");
+const { sellerOnboardUpload, productImagesUpload, shopEditUpload } = require("@middlewares/uploadMiddleware.js");
 
 const router = express.Router();
 
@@ -23,6 +23,8 @@ router.post("/create/shops", protect, restrictTo("admin", "seller", "buyer"), ma
 router.get("/get/shops", marketplaceController.getShops);
 router.get("/my-shop", protect, restrictTo("seller"), marketplaceController.getMyShop);
 router.get("/get/shops/:id", marketplaceController.getShopById);
+router.post("/shops/:id/views", protectOptional, marketplaceController.trackShopView);
+router.get("/shops/:id/stats", protect, restrictTo("seller"), marketplaceController.getShopStats);
 router.put("/edit/shops/:id", protect, restrictTo("seller"), shopEditUpload, marketplaceController.editShops);
 
 // Categories
@@ -34,19 +36,21 @@ router.post("/add/products", protect, restrictTo("admin", "seller", "buyer"), pr
 router.patch("/products/:productId", protect, restrictTo("admin", "seller"), productImagesUpload, marketplaceController.editProduct);
 router.delete("/products/:productId", protect, restrictTo("admin", "seller"), marketplaceController.deleteProduct);
 router.get("/get/products/shop/:shop_id", marketplaceController.getProductsByShop);
-router.get('/get/all/products', marketplaceController.getAllProduct);
-router.get('/get/products/:productId', marketplaceController.getProduct);
+router.get("/get/all/products", marketplaceController.getAllProduct);
+router.get("/get/products/:productId", marketplaceController.getProduct);
 
 // Orders
 router.post("/place/orders", protect, restrictTo("member", "buyer"), marketplaceController.createOrder);
 router.get("/get/orders", protect, restrictTo("member", "buyer"), marketplaceController.getOrdersByBuyer);
 router.get("/get/orders/:orderId", protect, restrictTo("member", "buyer"), marketplaceController.getoRdersById);
 router.get(
-    "/get/orders/shop/:shop_id",
-    protect,
-    restrictTo("seller"),
-    marketplaceController.getOrdersByShop
+  "/get/orders/shop/:shop_id",
+  protect,
+  restrictTo("seller"),
+  marketplaceController.getOrdersByShop
 );
-router.get('/get/seller/details', protect, restrictTo('admin'), marketplaceController.getSellerDetails);
+router.patch("/orders/:orderId/status", protect, restrictTo("admin", "seller"), marketplaceController.updateOrderStatus);
+router.get("/get/seller/details", protect, restrictTo("admin"), marketplaceController.getSellerDetails);
+
 
 module.exports = router;

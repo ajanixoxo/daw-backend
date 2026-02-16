@@ -13,12 +13,12 @@ const loginAndGetToken = async () => {
       `${process.env.VIGIPAY_CUSTOMER_BASE_URL}/api/Auth/getToken`,
       {
         userName: process.env.VIGIPAY_USERNAME,
-        password: process.env.VIGIPAY_PASSWORD,
+        password: process.env.VIGIPAY_PASSWORD
       },
       {
         headers: {
-          "Content-Type": "application/json",
-        },
+          "Content-Type": "application/json"
+        }
       }
     );
 

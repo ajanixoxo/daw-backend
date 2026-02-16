@@ -18,7 +18,7 @@ const createCategory = asyncHandler(async (req, res) => {
     ownerId: req.user._id,
     name,
     description,
-    color,
+    color
   });
 
   res.status(201).json({ success: true, category });
@@ -34,5 +34,5 @@ const getCategoriesByShop = asyncHandler(async (req, res) => {
 
 module.exports = {
   createCategory,
-  getCategoriesByShop,
+  getCategoriesByShop
 };

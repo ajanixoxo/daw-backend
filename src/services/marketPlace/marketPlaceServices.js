@@ -2,6 +2,7 @@ const Shop = require("@models/marketPlace/shopModel.js");
 const Product = require("@models/marketPlace/productModel.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const OrderItem = require("@models/marketPlace/orderItemModel.js");
+const ShopView = require("@models/marketPlace/shopViewModel.js");
 const AppError = require("@utils/Error/AppError.js");
 const mongoose = require("mongoose");
 
@@ -30,7 +31,7 @@ const editShop = async ({ shopId, ownerId, data }) => {
     "logo_url",
     "banner_url",
     "contact_number",
-    "business_address",
+    "business_address"
   ];
 
   const filteredData = {};
@@ -46,7 +47,7 @@ const editShop = async ({ shopId, ownerId, data }) => {
 
   const shop = await Shop.findOne({
     _id: shopId,
-    owner_id: ownerId,
+    owner_id: ownerId
   });
 
   if (!shop) {
@@ -67,7 +68,7 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
   const shop = await Shop.findOne({
     _id: shopId,
     owner_id: sellerId,
-    status: "active",
+    status: "active"
   });
 
   if (!shop) {
@@ -84,7 +85,7 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
 
   const existingProduct = await Product.findOne({
     shop_id: shopId,
-    name: { $regex: `^${name}$`, $options: "i" },
+    name: { $regex: `^${name}$`, $options: "i" }
   });
 
   if (existingProduct) {
@@ -103,7 +104,7 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
     variants: variants || [],
     productFeatures: productFeatures || "",
     careInstruction: careInstruction || "",
-    returnPolicy: returnPolicy || "",
+    returnPolicy: returnPolicy || ""
   });
 };
 
@@ -118,7 +119,7 @@ const editProduct = async ({ sellerId, productId, updates }) => {
   const shop = await Shop.findOne({
     _id: product.shop_id,
     owner_id: sellerId,
-    status: "active",
+    status: "active"
   });
 
   if (!shop) {
@@ -128,7 +129,7 @@ const editProduct = async ({ sellerId, productId, updates }) => {
   const allowedFields = [
     "name", "description", "category", "quantity", "price",
     "images", "status", "variants", "productFeatures",
-    "careInstruction", "returnPolicy",
+    "careInstruction", "returnPolicy"
   ];
 
   const filteredUpdates = {};
@@ -147,7 +148,7 @@ const editProduct = async ({ sellerId, productId, updates }) => {
     const duplicate = await Product.findOne({
       shop_id: product.shop_id,
       _id: { $ne: productId },
-      name: { $regex: `^${filteredUpdates.name}$`, $options: "i" },
+      name: { $regex: `^${filteredUpdates.name}$`, $options: "i" }
     });
     if (duplicate) {
       throw new AppError("Another product with this name already exists", 409);
@@ -166,7 +167,7 @@ const deleteProduct = async ({ sellerId, productId }) => {
 
   const shop = await Shop.findOne({
     _id: product.shop_id,
-    owner_id: sellerId,
+    owner_id: sellerId
   });
 
   if (!shop) {
@@ -195,7 +196,7 @@ const createOrder = async (buyer_id, items) => {
       }
 
       const product = await Product.findById(item.product_id);
-      if (!product) throw new AppError("Product not found", 404);
+      if (!product) {throw new AppError("Product not found", 404);}
 
       // 🔹 Derive shop_id from first product
       if (index === 0) {
@@ -221,7 +222,7 @@ const createOrder = async (buyer_id, items) => {
       orderItems.push({
         product_id: product._id,
         price: product.price,
-        quantity: item.quantity,
+        quantity: item.quantity
       });
 
       const originalQuantity = product.quantity;
@@ -245,12 +246,12 @@ const createOrder = async (buyer_id, items) => {
       total_amount,
       status: "pending",
       payment_status: "unpaid",
-      escrow_status: "pending",
+      escrow_status: "pending"
     });
 
     const finalItems = orderItems.map(i => ({
       ...i,
-      order_id: order._id,
+      order_id: order._id
     }));
 
     const createdItems = await OrderItem.insertMany(finalItems);
@@ -284,21 +285,18 @@ const getProductById = async (productId) => {
   try {
     return await Product.findById(productId);
   } catch (error) {
-    return res.status(500).json({
-      message: "Error while fetching product",
-      error: error.message,
-    });
+    return error;
   }
 };
 
 const getOrdersByShopId = async (shop_id) => {
- const orders = await Order.find({ shop_id })
+  const orders = await Order.find({ shop_id })
     .populate("buyer_id", "firstName lastName email phone")
     .populate("shop_id")
     .sort({ createdAt: -1 })
     .lean();
 
-  for (let order of orders) {
+  for (const order of orders) {
     const items = await OrderItem.find({ order_id: order._id })
       .populate({
         path: "product_id",
@@ -323,6 +321,28 @@ const getOrdersByShopId = async (shop_id) => {
   return orders;
 };
 
+// SHOP VIEWS
+const recordShopView = async (shopId, viewerId, ipAddress) => {
+  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+  // For logged-in users: deduplicate by user ID (ignore IP — it can vary)
+  // For guests: deduplicate by IP address
+  const filter = viewerId
+    ? { shop_id: shopId, viewer_id: viewerId, view_date: today }
+    : { shop_id: shopId, viewer_id: null, ip_address: ipAddress, view_date: today };
+
+  // Atomic upsert — even simultaneous requests only create one document
+  return ShopView.findOneAndUpdate(
+    filter,
+    { $setOnInsert: { shop_id: shopId, viewer_id: viewerId || null, ip_address: ipAddress, view_date: today } },
+    { upsert: true, new: true }
+  );
+};
+
+const getShopViewCount = async (shopId) => {
+  return ShopView.countDocuments({ shop_id: shopId });
+};
+
 module.exports = {
   createShop,
   getShops,
@@ -339,4 +359,6 @@ module.exports = {
   getAllProduct,
   getProductById,
   getOrdersByShopId,
+  recordShopView,
+  getShopViewCount
 };

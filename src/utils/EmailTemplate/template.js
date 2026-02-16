@@ -1,5 +1,5 @@
-const asyncHandler = require('express-async-handler');
-const sendEmail  = require("@utils/SendEmail/email.js")
+const asyncHandler = require("express-async-handler");
+const sendEmail  = require("@utils/SendEmail/email.js");
 
 const verificationEmailTemplate = asyncHandler(async(email, firstName, otp) => {
   const subject = "Email Verification Code - Digital African Women";
@@ -52,4 +52,4 @@ module.exports ={
   verificationEmailTemplate,
   loginOTPEmailTemplate,
   forgotPasswordOTPEmailTemplate
-}
+};
