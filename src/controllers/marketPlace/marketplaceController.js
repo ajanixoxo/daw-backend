@@ -102,7 +102,7 @@ const sellerOnboard = asyncHandler(async (req, res) => {
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
 
   if (!nin) { throw new AppError("NIN is required", 400); }
-  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Valid Identification is required", 400); }
 
   const owner_id = req.user._id;
   const foundUser = await User.findById(owner_id);
@@ -294,7 +294,7 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
   if (!nin) { throw new AppError("NIN is required", 400); }
-  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Valid Identification is required", 400); }
 
   const foundUser = await User.findById(userId);
   if (!foundUser) { throw new AppError("User not found", 404); }
@@ -460,7 +460,7 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
   if (!nin) { throw new AppError("NIN is required", 400); }
-  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Valid Identification is required", 400); }
 
   const foundUser = await User.findById(userId);
   if (!foundUser) { throw new AppError("User not found", 404); }
