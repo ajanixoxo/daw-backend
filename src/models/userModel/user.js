@@ -197,6 +197,14 @@ const UserSchema = new mongoose.Schema(
     pending_amount: {
       type: Number,
       default: 0
+    },
+    country: {
+      type: String,
+      trim: true
+    },
+    currency: {
+      type: String,
+      trim: true
     }
 
   },

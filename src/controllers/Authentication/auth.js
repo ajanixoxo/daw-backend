@@ -104,7 +104,9 @@ const registerUser = asyncHandler(async (req, res) => {
       phone,
       roles: finalRoles,
       otp,
-      otpExpiry
+      otpExpiry,
+      country: req.body.country,
+      currency: req.body.currency
     });
 
     await verificationEmailTemplate(newUser.email, newUser.firstName, otp);
@@ -535,6 +537,26 @@ const getUserProfile = asyncHandler(async (req, res) => {
       userObject.shop = [];
     }
 
+    // Proactively infer country and currency if missing
+    let needsUpdate = false;
+    if (!User.country && User.phone) {
+        if (User.phone.startsWith("+234") || User.phone.startsWith("234")) {
+            User.country = "Nigeria";
+            needsUpdate = true;
+        }
+    }
+    if (!User.currency && User.country === "Nigeria") {
+        User.currency = "NGN";
+        needsUpdate = true;
+    } else if (!User.currency && User.country) {
+        User.currency = "USD";
+        needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+        await User.save();
+    }
+
     return res.status(200).json({ success: true, user: userObject });
   } catch (error) {
     console.error("Error in getUserProfile:", error);
@@ -545,7 +567,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
 const updateUserProfile = asyncHandler(async (req, res) => {
   try {
     const userId = req.user._id;
-    const { firstName, lastName, phone } = req.body;
+    const { firstName, lastName, phone, country, currency } = req.body;
     
     const User = await user.findById(userId);
     if (!User) {
@@ -555,6 +577,8 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     if (firstName) User.firstName = firstName;
     if (lastName) User.lastName = lastName;
     if (phone) User.phone = phone;
+    if (country) User.country = country;
+    if (currency) User.currency = currency;
 
     // Handle profile picture upload
     if (req.file) {
@@ -579,6 +603,8 @@ const updateUserProfile = asyncHandler(async (req, res) => {
         email: User.email,
         phone: User.phone,
         profilePicture: User.profilePicture,
+        country: User.country,
+        currency: User.currency,
         roles: User.roles,
       },
     });
