@@ -28,7 +28,13 @@ const productSchema = new mongoose.Schema({
     type: String,
     enum: ["available", "unavailable", "draft", "out_of_stock"],
     default: "available"
+  },
+  currency: {
+    type: String,
+    enum: ["NGN", "USD"],
+    default: "NGN"
   }
+
 }, { timestamps: true });
 
 const Product = mongoose.model("Product", productSchema);

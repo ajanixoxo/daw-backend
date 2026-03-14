@@ -3,7 +3,9 @@ const Product = require("@models/marketPlace/productModel.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const OrderItem = require("@models/marketPlace/orderItemModel.js");
 const ShopView = require("@models/marketPlace/shopViewModel.js");
+const User = require("@models/userModel/user.js");
 const AppError = require("@utils/Error/AppError.js");
+const { convertPrice } = require("@utils/currency/currencyHandler.js");
 const mongoose = require("mongoose");
 
 // SHOP — one shop per user (business rule)
@@ -83,20 +85,16 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
     throw new AppError("Quantity cannot be negative", 400);
   }
 
-  const existingProduct = await Product.findOne({
-    shop_id: shopId,
-    name: { $regex: `^${name}$`, $options: "i" }
-  });
-
-  if (existingProduct) {
-    throw new AppError("Product already exists in this shop", 409);
-  }
+  // Fetch seller's currency preference or default by country
+  const seller = await User.findById(sellerId);
+  const sellerCurrency = seller?.country === "Nigeria" ? "NGN" : "USD";
 
   return await Product.create({
     shop_id: shopId,
     name,
     quantity,
     price,
+    currency: sellerCurrency,
     category,
     description,
     images: images || [],
@@ -108,7 +106,16 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
   });
 };
 
-const getProductsByShop = async (shop_id) => await Product.find({ shop_id });
+const getProductsByShop = async (shop_id, reqUser) => {
+  const products = await Product.find({ shop_id }).lean();
+  const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
+
+  return products.map(product => ({
+    ...product,
+    displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
+    displayCurrency: userCurrency
+  }));
+};
 
 const editProduct = async ({ sellerId, productId, updates }) => {
   const product = await Product.findById(productId);
@@ -273,17 +280,35 @@ const getOrdersById = async (orderId) => {
 };
 
 // PRODUCTS
-async function getAllProduct() {
+async function getAllProduct(reqUser) {
   try {
-    return await Product.find();
+    const products = await Product.find().lean();
+    
+    // Convert prices if user is logged in
+    const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
+    
+    return products.map(product => ({
+      ...product,
+      displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
+      displayCurrency: userCurrency
+    }));
   } catch (error) {
     return error;
   }
 }
 
-const getProductById = async (productId) => {
+const getProductById = async (productId, reqUser) => {
   try {
-    return await Product.findById(productId);
+    const product = await Product.findById(productId).lean();
+    if (!product) return null;
+
+    const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
+
+    return {
+      ...product,
+      displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
+      displayCurrency: userCurrency
+    };
   } catch (error) {
     return error;
   }
