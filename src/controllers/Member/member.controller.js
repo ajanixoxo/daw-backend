@@ -113,6 +113,8 @@ const guestJoin = async (req, res) => {
       firstName,
       lastName,
       phone,
+      country,
+      currency,
       cooperativeId,
       subscriptionTierId
     } = req.body || {};
@@ -152,6 +154,8 @@ const guestJoin = async (req, res) => {
       email: email.toLowerCase().trim(),
       password,
       phone: (phone || "").trim(),
+      country: (country || "").trim(),
+      currency: (currency || "USD").trim(),
       roles: ["buyer"],
       isVerified: false,
       otp,

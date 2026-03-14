@@ -102,7 +102,7 @@ const sellerOnboard = asyncHandler(async (req, res) => {
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
 
   if (!nin) { throw new AppError("NIN is required", 400); }
-  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Valid Identification is required", 400); }
 
   const owner_id = req.user._id;
   const foundUser = await User.findById(owner_id);
@@ -231,7 +231,7 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   let guestTempToken = null;
 
   if (!req.user || !req.user._id) {
-    const { firstName, lastName, email, phone, password, confirmPassword } = body;
+    const { firstName, lastName, email, phone, password, confirmPassword, country, currency } = body;
     if (!email || !password || !confirmPassword || !firstName || !phone) {
       throw new AppError("email, password, confirmPassword, firstName, and phone are required for guest", 400);
     }
@@ -251,6 +251,8 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
       email: String(email).toLowerCase().trim(),
       phone: (phone || "").trim(),
       password,
+      country: (country || "").trim(),
+      currency: (currency || "USD").trim(),
       roles: ["buyer"],
       isVerified: false,
       otp,
@@ -292,7 +294,7 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
   if (!nin) { throw new AppError("NIN is required", 400); }
-  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Valid Identification is required", 400); }
 
   const foundUser = await User.findById(userId);
   if (!foundUser) { throw new AppError("User not found", 404); }
@@ -404,7 +406,7 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
   let guestTempToken = null;
 
   if (!req.user || !req.user._id) {
-    const { firstName, lastName, email, phone, password, confirmPassword } = body;
+    const { firstName, lastName, email, phone, password, confirmPassword, country, currency } = body;
     if (!email || !password || !confirmPassword || !firstName || !phone) {
       throw new AppError("email, password, confirmPassword, firstName, and phone are required for guest", 400);
     }
@@ -424,6 +426,8 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
       email: String(email).toLowerCase().trim(),
       phone: (phone || "").trim(),
       password,
+      country: (country || "").trim(),
+      currency: (currency || "USD").trim(),
       roles: ["buyer"],
       isVerified: false,
       otp,
@@ -456,7 +460,7 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
   if (!nin) { throw new AppError("NIN is required", 400); }
-  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Valid Identification is required", 400); }
 
   const foundUser = await User.findById(userId);
   if (!foundUser) { throw new AppError("User not found", 404); }
