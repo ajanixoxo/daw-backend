@@ -17,7 +17,16 @@ const PaymentSchema = new mongoose.Schema(
       enum: ["pending", "successful", "failed"],
       default: "pending"
     },
-
+    paypalStatus: {
+      type: String,
+      enum: ["pending", "successful", "failed"],
+      default: "pending"
+    },
+    paystackStatus: {
+      type: String,
+      enum: ["pending", "successful", "failed"],
+      default: "pending"
+    },
     amountAfterCharge: Number,
     charge: Number,
 

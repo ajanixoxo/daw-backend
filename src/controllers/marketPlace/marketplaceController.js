@@ -785,11 +785,16 @@ const getProductsByShop = asyncHandler(async (req, res) => {
 const createOrder = asyncHandler(async (req, res) => {
   const { items } = req.body;
   const buyer_id = req.user._id;
-
+  console.log("Creating order for buyer:", buyer_id, "with items:", items);
   if (!items || items.length === 0) {
     throw new AppError("Order items are required", 400);
   }
 
+  const checkIfUserExist = await User.findById(buyer_id);
+  if (!checkIfUserExist) {
+    throw new AppError("User not found", 404);
+  }
+  
   const { order, orderItems } =
     await marketplaceService.createOrder(buyer_id, items);
 

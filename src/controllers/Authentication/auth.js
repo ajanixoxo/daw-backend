@@ -26,7 +26,7 @@ const registerUser = asyncHandler(async (req, res) => {
       phone, 
       roles
     } = req.body;
-
+    console.log(req.body);
     // Normalize roles
     let normalizedRoles = roles;
     
@@ -90,7 +90,7 @@ const registerUser = asyncHandler(async (req, res) => {
         message: "User already exists"
       });
     }
-
+    console.log('existing user', existingUser);
     const otp = generateOTP();
     const otpExpiry = Date.now() + 10 * 60 * 1000;
 
@@ -320,7 +320,15 @@ async function login(req, res) {
 
     return res.status(200).json({
       message: "OTP sent to email. Please verify OTP to complete login.",
-      user: User,
+      user: {
+        _id: User._id,
+        firstName: User.firstName,
+        lastName: User.lastName,
+        email: User.email,
+        phone: User.phone,
+        verified: User.isVerified,
+        roles: User.roles
+      },
       token: TempToken
     });
   } catch (error) {
