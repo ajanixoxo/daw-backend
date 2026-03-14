@@ -49,6 +49,8 @@ router.get(
   restrictTo("seller"),
   marketplaceController.getOrdersByShop
 );
+router.patch("/orders/:orderId/status", protect, restrictTo("admin", "seller"), marketplaceController.updateOrderStatus);
 router.get("/get/seller/details", protect, restrictTo("admin"), marketplaceController.getSellerDetails);
+
 
 module.exports = router;
