@@ -126,7 +126,7 @@ exports.createOrder = async (req, res) => {
       channel: "paypal",
       transactionReference: paypalOrder.id,
       redirectUrl: approvalUrl,
-      vigipayStatus: "pending",
+      paypalStatus: "pending",
       name: name || `${user.firstName} ${user.lastName}`,
       email: email || user.email,
       phone: phone || user.phone,
