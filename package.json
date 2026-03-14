@@ -22,7 +22,8 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "seed:shops": "node src/scripts/seedDemoShops.js"
   },
   "author": "",
   "license": "ISC",
