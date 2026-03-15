@@ -1,6 +1,8 @@
 const axios = require("axios");
 const Payment = require("@models/paymentModel/payment.model.js");
 const Order = require("@models/marketPlace/orderModel.js");
+const User = require("@models/userModel/user.js");
+const WalletLedger = require("@models/walletLedger/ledger.js");
 
 
 const getAccessToken = async () => {
@@ -65,8 +67,36 @@ exports.captureOrder = async (req, res) => {
       await payment.save();
 
       await Order.findByIdAndUpdate(payment.orderId, {
-        payment_status: "paid"
+        payment_status: "paid",
+        escrow_status: "held",
+        status: "processing"
       });
+
+      // --- Wallet Ledger ---
+      try {
+        const user = await User.findById(payment.userId);
+        await WalletLedger.findOneAndUpdate(
+          { reference: payment.transactionReference },
+          {
+            $setOnInsert: {
+              userId: payment.userId,
+              walletId: user?.walletId || "N/A",
+              reference: payment.transactionReference,
+              type: "CREDIT",
+              amount: payment.amount,
+              status: "SUCCESS",
+              channel: "paypal",
+              rawWebhookPayload: captured,
+              transactionDate: new Date()
+            }
+          },
+          { upsert: true, new: true }
+        );
+        console.log(`PayPal wallet ledger created for order: ${paypalOrderId}`);
+      } catch (ledgerErr) {
+        console.error("PayPal capture – wallet ledger error:", ledgerErr.message);
+      }
+      // ---------------------
 
       return res.status(200).json({
         success: true,

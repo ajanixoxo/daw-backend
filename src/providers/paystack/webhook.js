@@ -1,6 +1,8 @@
 const crypto = require("crypto");
 const Payment = require("@models/paymentModel/payment.model.js");
 const Order = require("@models/marketPlace/orderModel.js");
+const User = require("@models/userModel/user.js");
+const WalletLedger = require("@models/walletLedger/ledger.js");
 
 const verifySignature = (req) => {
   const hash = crypto
@@ -47,6 +49,32 @@ exports.handleWebhook = async (req, res) => {
                 payment_status: "paid"
               });
             }
+
+            // --- Wallet Ledger ---
+            try {
+              const user = await User.findById(payment.userId);
+              await WalletLedger.findOneAndUpdate(
+                { reference },
+                {
+                  $setOnInsert: {
+                    userId: payment.userId,
+                    walletId: user?.walletId || "N/A",
+                    reference,
+                    type: "CREDIT",
+                    amount: payment.amount,
+                    status: "SUCCESS",
+                    channel: "paystack",
+                    rawWebhookPayload: data,
+                    transactionDate: new Date()
+                  }
+                },
+                { upsert: true, new: true }
+              );
+              console.log(`Paystack webhook – wallet ledger created for reference: ${reference}`);
+            } catch (ledgerErr) {
+              console.error("Paystack webhook – wallet ledger error:", ledgerErr.message);
+            }
+            // ---------------------
 
             console.log(
               `Paystack payment marked successful for order: ${payment.orderId}`
