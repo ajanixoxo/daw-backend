@@ -326,27 +326,45 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
     banner_url = r.secure_url;
   }
 
-  const coopStoreUrl = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "") + "-" + Date.now();
+  // Reuse/update existing shop if the user already has one.
+  // This avoids intermittent duplicate-key failures from the unique owner_id index.
+  let shop = await Shop.findOne({ owner_id: userId });
 
-  const shopData = {
-    owner_id: userId,
-    cooperative_id: cooperativeId,
-    name,
-    store_url: coopStoreUrl,
-    description,
-    category,
-    contact_number: contactNumber,
-    business_address: businessAddress,
-    logo_url,
-    banner_url,
-    is_member_shop: true,
-    status: "active"
-  };
-  const shop = await marketplaceService.createShop(shopData);
-  if (!shop) { throw new AppError("Shop not created", 400); }
+  if (shop) {
+    shop.name = name;
+    shop.description = description;
+    shop.category = category;
+    shop.contact_number = contactNumber;
+    shop.business_address = businessAddress;
+    shop.cooperative_id = cooperativeId;
+    shop.is_member_shop = true;
+    shop.status = "active";
+    if (logo_url) { shop.logo_url = logo_url; }
+    if (banner_url) { shop.banner_url = banner_url; }
+    await shop.save();
+  } else {
+    const coopStoreUrl = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") + "-" + Date.now();
+
+    const shopData = {
+      owner_id: userId,
+      cooperative_id: cooperativeId,
+      name,
+      store_url: coopStoreUrl,
+      description,
+      category,
+      contact_number: contactNumber,
+      business_address: businessAddress,
+      logo_url,
+      banner_url,
+      is_member_shop: true,
+      status: "active"
+    };
+    shop = await marketplaceService.createShop(shopData);
+    if (!shop) { throw new AppError("Shop not created", 400); }
+  }
 
   const currentRoles = Array.isArray(foundUser.roles) ? foundUser.roles : [];
   if (!currentRoles.includes("seller")) { currentRoles.push("seller"); }
