@@ -14,7 +14,24 @@ const createShop = async (data) => {
   }
   return Shop.create(data);
 };
-const getShops = async () => await Shop.find();
+const getShops = async () => {
+  const shops = await Shop.find().lean();
+  if (shops.length === 0) return [];
+
+  const shopIds = shops.map((s) => s._id);
+  const counts = await Product.aggregate([
+    { $match: { shop_id: { $in: shopIds } } },
+    { $group: { _id: "$shop_id", count: { $sum: 1 } } },
+  ]);
+
+  const countMap = {};
+  counts.forEach((c) => { countMap[c._id.toString()] = c.count; });
+
+  return shops.map((shop) => ({
+    ...shop,
+    productCount: countMap[shop._id.toString()] || 0,
+  }));
+};
 const getShopById = async (id) => {
   return await Shop.findById(id);
 };

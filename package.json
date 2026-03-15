@@ -23,7 +23,8 @@
     "dev": "nodemon index.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "seed:shops": "node src/scripts/seedDemoShops.js"
+    "seed:shops": "node src/scripts/seedDemoShops.js",
+    "cleanup": "node src/scripts/cleanupOrphanedData.js"
   },
   "author": "",
   "license": "ISC",

@@ -196,11 +196,25 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
     User.isVerified = true;
     User.otp = null;
     User.otpExpiry = null;
+
+    // Issue a proper full token (with roles) so the user can act immediately
+    // without having to log out and log back in.
+    const { accessToken, refreshToken } = await User.generateToken();
+    User.refreshToken = refreshToken;
     await User.save();
 
     return res.status(200).json({
       success: true,
-      message: "Email verified successfully"
+      message: "Email verified successfully",
+      token: {
+        accessToken,
+        refreshToken,
+      },
+      user: {
+        _id: User._id,
+        email: User.email,
+        roles: User.roles,
+      },
     });
   } catch (error) {
     return next(error);
