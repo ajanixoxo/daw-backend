@@ -2,6 +2,8 @@ const axios = require("axios");
 const crypto = require("crypto");
 const Payment = require("@models/paymentModel/payment.model.js");
 const Order = require("@models/marketPlace/orderModel.js");
+const User = require("@models/userModel/user.js");
+const WalletLedger = require("@models/walletLedger/ledger.js");
 
 const verifyWebhookSignature = async (req) => {
   try {
@@ -87,6 +89,32 @@ exports.handleWebhook = async (req, res) => {
                 payment_status: "paid"
               });
             }
+
+            // --- Wallet Ledger ---
+            try {
+              const user = await User.findById(payment.userId);
+              await WalletLedger.findOneAndUpdate(
+                { reference: paypalOrderId },
+                {
+                  $setOnInsert: {
+                    userId: payment.userId,
+                    walletId: user?.walletId || "N/A",
+                    reference: paypalOrderId,
+                    type: "CREDIT",
+                    amount: payment.amount,
+                    status: "SUCCESS",
+                    channel: "paypal",
+                    rawWebhookPayload: resource,
+                    transactionDate: new Date()
+                  }
+                },
+                { upsert: true, new: true }
+              );
+              console.log(`PayPal webhook – wallet ledger created for order: ${paypalOrderId}`);
+            } catch (ledgerErr) {
+              console.error("PayPal webhook – wallet ledger error:", ledgerErr.message);
+            }
+            // ---------------------
 
             console.log(`PayPal payment completed for order: ${payment.orderId}`);
           }

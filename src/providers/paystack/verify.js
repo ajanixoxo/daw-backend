@@ -1,6 +1,8 @@
 const axios = require("axios");
 const Payment = require("@models/paymentModel/payment.model.js");
 const Order = require("@models/marketPlace/orderModel.js");
+const User = require("@models/userModel/user.js");
+const WalletLedger = require("@models/walletLedger/ledger.js");
 
 const PAYSTACK_BASE_URL = "https://api.paystack.co";
 const paystackAuthHeader = () => `Bearer ${process.env.PAYSTACK_SECRET_KEY}`;
@@ -42,8 +44,37 @@ exports.verifyPayment = async (req, res) => {
       await payment.save();
 
       await Order.findByIdAndUpdate(payment.orderId, {
-        payment_status: "paid"
+        payment_status: "paid",
+        escrow_status: "held",
+        status: "processing"
       });
+
+      // --- Wallet Ledger ---
+      try {
+        const user = await User.findById(payment.userId);
+        await WalletLedger.findOneAndUpdate(
+          { reference },
+          {
+            $setOnInsert: {
+              userId: payment.userId,
+              walletId: user?.walletId || "N/A",
+              reference,
+              type: "CREDIT",
+              amount: payment.amount,
+              status: "SUCCESS",
+              channel: "paystack",
+              rawWebhookPayload: txn,
+              transactionDate: new Date()
+            }
+          },
+          { upsert: true, new: true }
+        );
+        console.log(`Paystack wallet ledger created for reference: ${reference}`);
+      } catch (ledgerErr) {
+        // Ledger failure must not block the payment response
+        console.error("Paystack verify – wallet ledger error:", ledgerErr.message);
+      }
+      // ---------------------
 
       return res.status(200).json({
         success: true,

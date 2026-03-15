@@ -19,7 +19,7 @@ exports.verifyPayment = async (req, res) => {
     if (!payment) {
       return res.status(404).json({ message: "Payment not found" });
     }
-
+    console.log("Payment found for reference:", reference, "Payment ID:", payment._id);
     payment.vigipayStatus =
       data.status === "Successful" ? "successful" : "failed";
     payment.amountAfterCharge = data.amountAfterCharge;
@@ -40,41 +40,42 @@ exports.verifyPayment = async (req, res) => {
     const order = await Order.findById(payment.orderId);
     if (!order) {throw new Error("Order not found");}
 
-    if (order.payment_status === "paid") {
-      return res.json({
-        success: true,
-        message: "Payment already processed",
-        payment
-      });
-    }
+    // if (order.payment_status === "paid") {
+    //   return res.json({
+    //     success: true,
+    //     message: "Payment already processed",
+    //     payment
+    //   });
+    // }
 
     order.payment_status = "paid";
     order.escrow_status = "held";
     order.status = "processing";
     await order.save();
-
+    console.log("platform...")
     const platformOwner = await User.findOne({
       roles: { $in: ["admin"] },
-      walletId: { $exists: true }
+      walletId: { $exists: true, $ne: null }
     });
+    console.log("Platform owner found:", !!platformOwner, platformOwner ? platformOwner._id : "No platform owner");
 
     if (!platformOwner) {
-      throw new Error("Platform owner wallet not configured");
+      console.warn("No platform owner wallet configured. Skipping ledger entry for platform.");
+    } else {
+      await WalletLedger.create({
+        userId: platformOwner._id,
+        walletId: platformOwner.walletId || "N/A",
+        reference: payment.transactionReference,
+        merchantRef: order._id.toString(),
+        type: "CREDIT",
+        amount: payment.amountAfterCharge,
+        status: "SUCCESS",
+        channel: "vigipay",
+        beneficiaryAccount: platformOwner.walletId,
+        rawWebhookPayload: data,
+        transactionDate: new Date()
+      });
     }
-
-    await WalletLedger.create({
-      userId: platformOwner._id,
-      walletId: platformOwner.walletId,
-      reference: payment.transactionReference,
-      merchantRef: order._id.toString(),
-      type: "CREDIT",
-      amount: payment.amountAfterCharge,
-      status: "SUCCESS",
-      channel: "vigipay",
-      beneficiaryAccount: platformOwner.walletId,
-      rawWebhookPayload: data,
-      transactionDate: new Date()
-    });
 
     const shop = await Shop.findById(order.shop_id);
     if (!shop) {throw new Error("Shop not found");}
