@@ -124,11 +124,13 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
 };
 
 const getProductsByShop = async (shop_id, reqUser) => {
-  const products = await Product.find({ shop_id }).lean();
+  const products = await Product.find({ shop_id }).populate("shop_id", "name").lean();
   const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
 
   return products.map(product => ({
     ...product,
+    shop_name: product.shop_id?.name || "",
+    shop_id: product.shop_id?._id || product.shop_id,
     displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
     displayCurrency: userCurrency
   }));
@@ -299,13 +301,14 @@ const getOrdersById = async (orderId) => {
 // PRODUCTS
 async function getAllProduct(reqUser) {
   try {
-    const products = await Product.find().lean();
-    
-    // Convert prices if user is logged in
+    const products = await Product.find().populate("shop_id", "name").lean();
+
     const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
-    
+
     return products.map(product => ({
       ...product,
+      shop_name: product.shop_id?.name || "",
+      shop_id: product.shop_id?._id || product.shop_id,
       displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
       displayCurrency: userCurrency
     }));
@@ -316,13 +319,15 @@ async function getAllProduct(reqUser) {
 
 const getProductById = async (productId, reqUser) => {
   try {
-    const product = await Product.findById(productId).lean();
+    const product = await Product.findById(productId).populate("shop_id", "name").lean();
     if (!product) return null;
 
     const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
 
     return {
       ...product,
+      shop_name: product.shop_id?.name || "",
+      shop_id: product.shop_id?._id || product.shop_id,
       displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
       displayCurrency: userCurrency
     };
