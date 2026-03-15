@@ -747,7 +747,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
 const getProduct = async (req, res) => {
   try {
     const { productId } = req.params;
-    const productView = await marketplaceService.getProductById(productId);
+    const productView = await marketplaceService.getProductById(productId, req.user);
     if (!productView) {
       return res.status(404).json({
         message: "product not found"
@@ -769,7 +769,7 @@ const getProduct = async (req, res) => {
 // Get products by shop
 const getProductsByShop = asyncHandler(async (req, res) => {
   const { shop_id } = req.params;
-  const products = await marketplaceService.getProductsByShop(shop_id);
+  const products = await marketplaceService.getProductsByShop(shop_id, req.user);
   res.status(200).json({ success: true, products });
 });
 
@@ -819,7 +819,7 @@ const getoRdersById = asyncHandler(async (req, res) => {
 
 const getAllProduct = asyncHandler(async (req, res) => {
   try {
-    const products = await marketplaceService.getAllProduct();
+    const products = await marketplaceService.getAllProduct(req.user);
     if (!products) {
       return res.status(400).json({
         message: "No products available"

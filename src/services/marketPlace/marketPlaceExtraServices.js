@@ -328,8 +328,8 @@ const updateCartItemQuantity = async (cart_item_id, quantity, user_id) => {
     throw new AppError(`Only ${product.quantity} units available`, 400);
   }
 
-  cartItem.quantity += quantity;
-  cartItem.price += product.price * quantity; 
+  cartItem.quantity = quantity; // Update to the absolute quantity provided by frontend usually, or handle delta
+  cartItem.price = product.price; // Ensure it's the current unit price
   await cartItem.save();
 
   return await CartItem.findById(cartItem._id)

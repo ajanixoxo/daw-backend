@@ -3,7 +3,9 @@ const Product = require("@models/marketPlace/productModel.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const OrderItem = require("@models/marketPlace/orderItemModel.js");
 const ShopView = require("@models/marketPlace/shopViewModel.js");
+const User = require("@models/userModel/user.js");
 const AppError = require("@utils/Error/AppError.js");
+const { convertPrice } = require("@utils/currency/currencyHandler.js");
 const mongoose = require("mongoose");
 
 // SHOP — one shop per user (business rule)
@@ -14,7 +16,24 @@ const createShop = async (data) => {
   }
   return Shop.create(data);
 };
-const getShops = async () => await Shop.find();
+const getShops = async () => {
+  const shops = await Shop.find().lean();
+  if (shops.length === 0) return [];
+
+  const shopIds = shops.map((s) => s._id);
+  const counts = await Product.aggregate([
+    { $match: { shop_id: { $in: shopIds } } },
+    { $group: { _id: "$shop_id", count: { $sum: 1 } } },
+  ]);
+
+  const countMap = {};
+  counts.forEach((c) => { countMap[c._id.toString()] = c.count; });
+
+  return shops.map((shop) => ({
+    ...shop,
+    productCount: countMap[shop._id.toString()] || 0,
+  }));
+};
 const getShopById = async (id) => {
   return await Shop.findById(id);
 };
@@ -83,20 +102,16 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
     throw new AppError("Quantity cannot be negative", 400);
   }
 
-  const existingProduct = await Product.findOne({
-    shop_id: shopId,
-    name: { $regex: `^${name}$`, $options: "i" }
-  });
-
-  if (existingProduct) {
-    throw new AppError("Product already exists in this shop", 409);
-  }
+  // Fetch seller's currency preference or default by country
+  const seller = await User.findById(sellerId);
+  const sellerCurrency = seller?.country === "Nigeria" ? "NGN" : "USD";
 
   return await Product.create({
     shop_id: shopId,
     name,
     quantity,
     price,
+    currency: sellerCurrency,
     category,
     description,
     images: images || [],
@@ -108,7 +123,18 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
   });
 };
 
-const getProductsByShop = async (shop_id) => await Product.find({ shop_id });
+const getProductsByShop = async (shop_id, reqUser) => {
+  const products = await Product.find({ shop_id }).populate("shop_id", "name").lean();
+  const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
+
+  return products.map(product => ({
+    ...product,
+    shop_name: product.shop_id?.name || "",
+    shop_id: product.shop_id?._id || product.shop_id,
+    displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
+    displayCurrency: userCurrency
+  }));
+};
 
 const editProduct = async ({ sellerId, productId, updates }) => {
   const product = await Product.findById(productId);
@@ -273,17 +299,38 @@ const getOrdersById = async (orderId) => {
 };
 
 // PRODUCTS
-async function getAllProduct() {
+async function getAllProduct(reqUser) {
   try {
-    return await Product.find();
+    const products = await Product.find().populate("shop_id", "name").lean();
+
+    const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
+
+    return products.map(product => ({
+      ...product,
+      shop_name: product.shop_id?.name || "",
+      shop_id: product.shop_id?._id || product.shop_id,
+      displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
+      displayCurrency: userCurrency
+    }));
   } catch (error) {
     return error;
   }
 }
 
-const getProductById = async (productId) => {
+const getProductById = async (productId, reqUser) => {
   try {
-    return await Product.findById(productId);
+    const product = await Product.findById(productId).populate("shop_id", "name").lean();
+    if (!product) return null;
+
+    const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
+
+    return {
+      ...product,
+      shop_name: product.shop_id?.name || "",
+      shop_id: product.shop_id?._id || product.shop_id,
+      displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
+      displayCurrency: userCurrency
+    };
   } catch (error) {
     return error;
   }
