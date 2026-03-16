@@ -73,6 +73,9 @@ exports.verifyPayment = async (req, res) => {
         channel: "vigipay",
         beneficiaryAccount: platformOwner.walletId,
         rawWebhookPayload: data,
+        shopId: payment.shopId,
+        shop_ownerId: payment.shopOwnerId,
+        shopName: payment.shopName,
         transactionDate: new Date()
       });
     }

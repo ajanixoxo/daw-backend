@@ -58,6 +58,19 @@ const walletLedgerSchema = new mongoose.Schema(
 
     transactionDate: {
       type: Date
+    },
+    shopId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shop",
+      index: true
+    },
+    shop_ownerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      index: true
+    },
+    shopName: {
+      type: String
     }
   },
   { timestamps: true }

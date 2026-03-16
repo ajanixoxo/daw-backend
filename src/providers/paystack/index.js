@@ -2,6 +2,7 @@ const axios = require("axios");
 const Payment = require("@models/paymentModel/payment.model.js");
 const User = require("@models/userModel/user.js");
 const Order = require("@models/marketPlace/orderModel.js");
+const Shop = require("@models/marketPlace/shopModel.js");
 const AppError = require("@utils/Error/AppError.js");
 
 const paystackAuthHeader = () => `Bearer ${process.env.PAYSTACK_SECRET_KEY}`;
@@ -47,6 +48,11 @@ exports.initializePayment = async (req, res) => {
 
     if (!order) {
       throw new AppError("Invalid or already paid order", 400);
+    }
+
+    const shop = await Shop.findById(order.shop_id);
+    if (!shop) {
+      throw new AppError("Shop not found for this order", 404);
     }
 
     const amount = order.total_amount;
@@ -100,6 +106,9 @@ exports.initializePayment = async (req, res) => {
       userId: user._id,
       orderId: order._id.toString(),
       amount,
+      shopId: shop._id,
+      shopOwnerId: shop.owner_id,
+      shopName: shop.name ||"N/A",
       description: description || "Order Payment",
       currency,
       channel: "paystack",

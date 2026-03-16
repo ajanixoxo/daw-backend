@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const Payment = require("@models/paymentModel/payment.model.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const User = require("@models/userModel/user.js");
+const Shop = require("@models/marketPlace/shopModel.js");
 const WalletLedger = require("@models/walletLedger/ledger.js");
 
 const verifySignature = (req) => {
@@ -65,16 +66,39 @@ exports.handleWebhook = async (req, res) => {
                     status: "SUCCESS",
                     channel: "paystack",
                     rawWebhookPayload: data,
-                    transactionDate: new Date()
-                  }
+                    shopId: payment.shopId,
+                    shop_ownerId: payment.shopOwnerId,
+                    shopName: payment.shopName,
+
+                    transactionDate: new Date(),
+                  },
                 },
-                { upsert: true, new: true }
+                { upsert: true, new: true },
               );
               console.log(`Paystack webhook – wallet ledger created for reference: ${reference}`);
             } catch (ledgerErr) {
               console.error("Paystack webhook – wallet ledger error:", ledgerErr.message);
             }
             // ---------------------
+
+            // --- Seller Pending Amount ---
+            try {
+              const order = await Order.findById(payment.orderId);
+              if (order?.shop_id) {
+                const shop = await Shop.findById(order.shop_id);
+                if (shop?.owner_id) {
+                  const seller = await User.findById(shop.owner_id);
+                  if (seller) {
+                    seller.pending_amount = (seller.pending_amount || 0) + payment.amount;
+                    await seller.save();
+                    console.log(`Paystack webhook – seller ${seller._id} pending_amount updated: ${seller.pending_amount}`);
+                  }
+                }
+              }
+            } catch (sellerErr) {
+              console.error("Paystack webhook – seller pending_amount error:", sellerErr.message);
+            }
+            // -----------------------------
 
             console.log(
               `Paystack payment marked successful for order: ${payment.orderId}`
