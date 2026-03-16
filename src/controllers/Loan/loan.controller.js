@@ -189,11 +189,68 @@ const listCooperativeLoans = async (req, res) => {
   }
 };
 
+/**
+ * Get eligible loan tiers/settings for a member
+ * Used to populate the "Apply for Loan" drowdown/info
+ */
+const getEligibleLoanTiers = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const Member = require("../../models/memberModel/member.model.js");
+    const SubscriptionTier = require("../../models/subscriptionTierModel/subscriptionTier.model.js");
+
+    const member = await Member.findOne({ userId }).populate("subscriptionTierId");
+    if (!member) {
+      return res.status(404).json({ success: false, message: "Member not found" });
+    }
+
+    const tier = member.subscriptionTierId;
+    if (!tier) {
+        return res.status(404).json({ success: false, message: "Subscription tier not found" });
+    }
+
+    // Return tier details which contain loan settings
+    return res.status(200).json({
+      success: true,
+      data: {
+        tierName: tier.name,
+        maxLoanAmount: tier.loanSettings?.maxAmount || 0,
+        interestRate: tier.loanSettings?.interestRate || 0,
+        maxDurationMonths: tier.loanSettings?.maxDurationMonths || 12,
+        eligibilityCriteria: tier.loanSettings?.eligibilityCriteria || {}
+      }
+    });
+
+  } catch (err) {
+    console.error("Error fetching eligible loan tiers:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const listMyLoans = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const Member = require("../../models/memberModel/member.model.js");
+    
+    const member = await Member.findOne({ userId });
+    if (!member) {
+      return res.json([]);
+    }
+
+    const loans = await LoanService.getByMember(member._id);
+    return res.json(loans);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
 module.exports = {
   applyForLoan,
   approveLoan,
   rejectLoan,
   listMemberLoans,
   getLoanStats,
-  listCooperativeLoans
+  listCooperativeLoans,
+  getEligibleLoanTiers,
+  listMyLoans
 };

@@ -5,7 +5,7 @@ dotenv.config();
 const { loginAndGetToken } = require("../../provider/vigipaySling/vigipayAuth/auth.js");
 
 const vigipayClient = axios.create({
-  baseURL: process.env.VIGIPAY_CUSTOMER_BASE_URL,
+  baseURL: process.env.VIGIPAY_BASE_URL,
 
   headers: {
     "Content-Type": "application/json",

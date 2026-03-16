@@ -34,6 +34,10 @@ const UserSchema = new mongoose.Schema(
       match: [/.+\@.+\..+/, "Please fill a valid email address"]
     },
 
+    profilePicture: {
+      type: String,
+    },
+
     phone: {
       type: String,
       required: [true, "phone number is required"],
@@ -193,6 +197,14 @@ const UserSchema = new mongoose.Schema(
     pending_amount: {
       type: Number,
       default: 0
+    },
+    country: {
+      type: String,
+      trim: true
+    },
+    currency: {
+      type: String,
+      trim: true
     }
 
   },

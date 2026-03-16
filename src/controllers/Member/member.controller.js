@@ -38,7 +38,15 @@ const join = async (req, res) => {
       cooperativeId,
       subscriptionTierId
     });
-    return res.status(201).json({ message: "Joined", member });
+
+    // Return updated user so the frontend can sync roles in localStorage
+    const updatedUser = await require("../../models/userModel/user.js")
+      .findById(userId)
+      .select("firstName lastName email phone roles isVerified status shop avatar")
+      .populate("shop", "_id name")
+      .lean();
+
+    return res.status(201).json({ message: "Joined", member, user: updatedUser });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -72,6 +80,25 @@ const getMember = async (req, res) => {
   }
 };
 
+const getDetails = async (req, res) => {
+  try {
+    const details = await MemberService.getDetails(req.params.id);
+    if (!details) return res.status(404).json({ error: "Member not found" });
+    return res.json(details);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+const removeMember = async (req, res) => {
+  try {
+    await MemberService.removeMember(req.params.id);
+    return res.json({ message: "Member removed successfully" });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
 /**
  * CASE 3: Guest joins cooperative.
  * No auth. If email already exists → require login (do not create duplicate user).
@@ -86,6 +113,8 @@ const guestJoin = async (req, res) => {
       firstName,
       lastName,
       phone,
+      country,
+      currency,
       cooperativeId,
       subscriptionTierId
     } = req.body || {};
@@ -125,6 +154,8 @@ const guestJoin = async (req, res) => {
       email: email.toLowerCase().trim(),
       password,
       phone: (phone || "").trim(),
+      country: (country || "").trim(),
+      currency: (currency || "USD").trim(),
       roles: ["buyer"],
       isVerified: false,
       otp,
@@ -171,5 +202,7 @@ module.exports = {
   guestJoin,
   approve,
   listMembers,
-  getMember
+  getMember,
+  getDetails,
+  removeMember
 };

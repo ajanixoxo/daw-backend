@@ -1,7 +1,7 @@
 const vigipayClient = require("../../utils/vigipayClient/vigipayClient.js");
 const User = require("../../models/userModel/user.js");
 const walletLedger = require("../../models/walletLedger/ledger.js");
-const { v4: uuidv4 } = require("uuid");
+const crypto = require("crypto");
 
 exports.createStatic = async (req, res) => {
   try {
@@ -158,7 +158,7 @@ exports.processPayout = async (req, res) => {
     }
 
     //Generate merchant reference (YOUR reference)
-    const merchantRef = `PAYOUT_${uuidv4()}`;
+    const merchantRef = `PAYOUT_${crypto.randomUUID()}`;
 
     // Get charge details
     const chargeRes = await vigipayClient.post("/api/Wallet/charge", {

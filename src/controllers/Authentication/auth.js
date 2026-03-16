@@ -8,6 +8,7 @@ const {
   loginOTPEmailTemplate,
   forgotPasswordOTPEmailTemplate
 } = require("@utils/EmailTemplate/template.js");
+const { uploadBuffer } = require("@utils/cloudinary/cloudinary.js");
 const jwt = require("jsonwebtoken");
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -103,7 +104,9 @@ const registerUser = asyncHandler(async (req, res) => {
       phone,
       roles: finalRoles,
       otp,
-      otpExpiry
+      otpExpiry,
+      country: req.body.country,
+      currency: req.body.currency
     });
 
     await verificationEmailTemplate(newUser.email, newUser.firstName, otp);
@@ -193,11 +196,25 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
     User.isVerified = true;
     User.otp = null;
     User.otpExpiry = null;
+
+    // Issue a proper full token (with roles) so the user can act immediately
+    // without having to log out and log back in.
+    const { accessToken, refreshToken } = await User.generateToken();
+    User.refreshToken = refreshToken;
     await User.save();
 
     return res.status(200).json({
       success: true,
-      message: "Email verified successfully"
+      message: "Email verified successfully",
+      token: {
+        accessToken,
+        refreshToken,
+      },
+      user: {
+        _id: User._id,
+        email: User.email,
+        roles: User.roles,
+      },
     });
   } catch (error) {
     return next(error);
@@ -292,9 +309,10 @@ async function login(req, res) {
     const User = await user.findOne({ email }).select("+password");
     if (!User) {return res.status(404).json({ message: "User not found" });}
 
+
     const isMatched = await User.comparePassword(password);
     if (!isMatched) {
-      return res.status(400).json({ message: "Invalid password" });
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
     if (!User.isVerified) {
@@ -486,28 +504,43 @@ const getUserProfile = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Find all memberships for this user
-    const memberships = await Member.find({ userId }).select("_id cooperativeId status joinDate monthlyContribution subscriptionTierId");
+    // Implement user-specific cooperative check logic
+    const roles = User.roles;
+    let isMember = false;
+
+    // Check last role or length
+    if (roles && roles.length > 0) {
+        const lastRole = roles[roles.length - 1];
+        if (lastRole === "member" || lastRole === "cooperative" || roles.length === 3) {
+            isMember = true;
+        }
+    }
+
+    // Initialize member array
+    const userObject = User.toObject();
+    userObject.member = [];
+
+    // If deemed a member, query the Member collection
+    if (isMember) {
+        const membership = await Member.findOne({ userId })
+            .populate("cooperativeId", "name"); // Get name directly here
+        
+        if (membership) {
+            userObject.member = [{
+                memberId: membership._id,
+                cooperativeId: membership.cooperativeId, // This is the populated object with name
+                status: membership.status,
+                joinDate: membership.joinDate,
+                monthlyContribution: membership.monthlyContribution,
+                subscriptionTierId: membership.subscriptionTierId
+            }];
+        }
+    }
 
     // Find all shops owned by this user
-    const shops = await Shop.find({ owner_id: userId }).select("_id name description category logo_url banner_url is_member_shop status cooperative_id");
-
-    // Convert user to object and add member information
-    const userObject = User.toObject();
-    
-    // Add member information if user has joined any cooperative
-    if (memberships && memberships.length > 0) {
-      userObject.member = memberships.map(membership => ({
-        memberId: membership._id,
-        cooperativeId: membership.cooperativeId,
-        status: membership.status,
-        joinDate: membership.joinDate,
-        monthlyContribution: membership.monthlyContribution,
-        subscriptionTierId: membership.subscriptionTierId
-      }));
-    } else {
-      userObject.member = [];
-    }
+    const shops = await Shop.find({ owner_id: userId })
+      .select("_id name description category logo_url banner_url is_member_shop status cooperative_id")
+      .populate("cooperative_id", "name");
 
     // Add shop information if user owns any shops
     if (shops && shops.length > 0) {
@@ -526,10 +559,116 @@ const getUserProfile = asyncHandler(async (req, res) => {
       userObject.shop = [];
     }
 
+    // Proactively infer country and currency if missing
+    let needsUpdate = false;
+    if (!User.country && User.phone) {
+        if (User.phone.startsWith("+234") || User.phone.startsWith("234")) {
+            User.country = "Nigeria";
+            needsUpdate = true;
+        }
+    }
+    if (!User.currency && User.country === "Nigeria") {
+        User.currency = "NGN";
+        needsUpdate = true;
+    } else if (!User.currency && User.country) {
+        User.currency = "USD";
+        needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+        await User.save();
+    }
+
     return res.status(200).json({ success: true, user: userObject });
   } catch (error) {
     console.error("Error in getUserProfile:", error);
     return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+const updateUserProfile = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { firstName, lastName, phone, country, currency } = req.body;
+    
+    const User = await user.findById(userId);
+    if (!User) {
+      throw new AppError("User not found", 404);
+    }
+
+    if (firstName) User.firstName = firstName;
+    if (lastName) User.lastName = lastName;
+    if (phone) User.phone = phone;
+    if (country) User.country = country;
+    if (currency) User.currency = currency;
+
+    // Handle profile picture upload
+    if (req.file) {
+      const folder = "daw/users/profiles";
+      const prefix = `user_${userId}`;
+      const result = await uploadBuffer(req.file.buffer, {
+        folder,
+        publicIdPrefix: `${prefix}_${Date.now()}`,
+      });
+      User.profilePicture = result.secure_url;
+    }
+
+    await User.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: {
+        _id: User._id,
+        firstName: User.firstName,
+        lastName: User.lastName,
+        email: User.email,
+        phone: User.phone,
+        profilePicture: User.profilePicture,
+        country: User.country,
+        currency: User.currency,
+        roles: User.roles,
+      },
+    });
+  } catch (error) {
+    console.error("Error updates user profile:", error);
+    throw new AppError(error.message || "Error updating profile", 500);
+  }
+});
+
+const changePassword = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { currentPassword, newPassword, confirmNewPassword } = req.body;
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      throw new AppError("All fields are required", 400);
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      throw new AppError("New passwords do not match", 400);
+    }
+
+    const User = await user.findById(userId).select("+password");
+    if (!User) {
+      throw new AppError("User not found", 404);
+    }
+
+    const isMatch = await User.comparePassword(currentPassword);
+    if (!isMatch) {
+      throw new AppError("Incorrect current password", 401);
+    }
+
+    User.password = newPassword;
+    await User.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    console.error("Error changing password:", error);
+    throw new AppError(error.message || "Error changing password", 500);
   }
 });
 
@@ -543,5 +682,7 @@ module.exports = {
   logout,
   forgotPassword,
   resetPassword,
-  getUserProfile
+  getUserProfile,
+  updateUserProfile,
+  changePassword
 };

@@ -15,7 +15,7 @@ exports.createPayment = async (req, res) => {
     }
 
     const {
-      // amount,
+      // amount: providedAmount,
       orderId,
       description,
       name,
@@ -48,6 +48,17 @@ exports.createPayment = async (req, res) => {
       throw new AppError("Shop not found for this order", 404);
     }
     const amount = order.total_amount;
+
+    // let amount = order.total_amount;
+    
+    // If frontend provides an amount (subtotal/total calculated with extras), use it and sync order
+    // if (providedAmount && providedAmount > 0) {
+    //   amount = providedAmount;
+    //   if (order.total_amount !== providedAmount) {
+    //     order.total_amount = providedAmount;
+    //     await order.save();
+    //   }
+    // }
 
     const payload = {
       customerReference: order._id.toString(),

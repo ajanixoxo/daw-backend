@@ -77,7 +77,8 @@ const createShop = asyncHandler(async (req, res) => {
  * Seller onboarding (non-cooperative): shop info + document uploads.
  * POST /marketplace/seller-onboard (multipart/form-data)
  * Body: name (or shopName), description, category, contactNumber?, businessAddress?
- * Files: shopLogo?, shopBanner?, idDocument, proofOfResidence, businessCac, passportPhotograph
+ * Files: shopLogo?, shopBanner?, passportPhotograph, businessCac?
+ * Body also includes: nin (required)
  */
 const sellerOnboard = asyncHandler(async (req, res) => {
   if (!req.user || !req.user._id) {
@@ -96,15 +97,12 @@ const sellerOnboard = asyncHandler(async (req, res) => {
   if (!description) { throw new AppError("Shop description is required", 400); }
   if (!category) { throw new AppError("Shop category is required", 400); }
 
-  const idDoc = Array.isArray(files.idDocument) ? files.idDocument[0] : files.idDocument;
-  const proofRes = Array.isArray(files.proofOfResidence) ? files.proofOfResidence[0] : files.proofOfResidence;
+  const nin = (body.nin || "").trim();
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
 
-  if (!idDoc || !idDoc.buffer) { throw new AppError("ID document is required", 400); }
-  if (!proofRes || !proofRes.buffer) { throw new AppError("Proof of residence is required", 400); }
-  if (!businessCacFile || !businessCacFile.buffer) { throw new AppError("Business CAC is required", 400); }
-  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
+  if (!nin) { throw new AppError("NIN is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Valid Identification is required", 400); }
 
   const owner_id = req.user._id;
   const foundUser = await User.findById(owner_id);
@@ -114,12 +112,15 @@ const sellerOnboard = asyncHandler(async (req, res) => {
   const folderShop = "daw/shops";
   const prefix = `seller_${owner_id.toString()}`;
 
-  const [idDocResult, proofResResult, cacResult, passportResult] = await Promise.all([
-    uploadBuffer(idDoc.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_id` }),
-    uploadBuffer(proofRes.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_proof` }),
-    uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }),
+  const uploadPromises = [
     uploadBuffer(passportPhoto.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_passport` })
-  ]);
+  ];
+  if (businessCacFile && businessCacFile.buffer) {
+    uploadPromises.push(uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }));
+  }
+  const uploadResults = await Promise.all(uploadPromises);
+  const passportResult = uploadResults[0];
+  const cacResult = uploadResults[1] || null;
 
   let logo_url = null;
   let banner_url = null;
@@ -171,10 +172,9 @@ const sellerOnboard = asyncHandler(async (req, res) => {
 
   const sellerDoc = await SellerDocuments.create({
     user_id: owner_id,
-    id_document_url: idDocResult.secure_url,
-    proof_of_residence_url: proofResResult.secure_url,
-    business_cac_url: cacResult.secure_url,
+    nin,
     passport_photograph_url: passportResult.secure_url,
+    business_cac_url: cacResult ? cacResult.secure_url : null,
     status: "pending"
   });
 
@@ -184,10 +184,14 @@ const sellerOnboard = asyncHandler(async (req, res) => {
     sellerDocuments: {
       _id: sellerDoc._id,
       status: sellerDoc.status,
-      id_document_url: sellerDoc.id_document_url,
-      proof_of_residence_url: sellerDoc.proof_of_residence_url,
-      business_cac_url: sellerDoc.business_cac_url,
-      passport_photograph_url: sellerDoc.passport_photograph_url
+      nin: sellerDoc.nin,
+      passport_photograph_url: sellerDoc.passport_photograph_url,
+      business_cac_url: sellerDoc.business_cac_url
+    },
+    user: {
+      _id: foundUser._id,
+      roles: foundUser.roles,
+      shop: foundUser.shop
     }
   });
 });
@@ -217,17 +221,17 @@ const getMySellerDocuments = asyncHandler(async (req, res) => {
  * Optional auth: if no token, treat as guest (require firstName, lastName, email, phone, password, confirmPassword).
  * Body: firstName?, lastName?, email?, phone?, password?, confirmPassword? (guest);
  *       name|shopName, description, category, contactNumber?, businessAddress?, cooperativeId, subscriptionTierId
- * Files: shopLogo?, shopBanner?, idDocument, proofOfResidence, businessCac, passportPhotograph
+ * Files: shopLogo?, shopBanner?, passportPhotograph, businessCac?
+ * Body also includes: nin (required)
  */
 const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   const body = req.body || {};
   const files = req.files || {};
   let userId;
-  let guestUser = null;
   let guestTempToken = null;
 
   if (!req.user || !req.user._id) {
-    const { firstName, lastName, email, phone, password, confirmPassword } = body;
+    const { firstName, lastName, email, phone, password, confirmPassword, country, currency } = body;
     if (!email || !password || !confirmPassword || !firstName || !phone) {
       throw new AppError("email, password, confirmPassword, firstName, and phone are required for guest", 400);
     }
@@ -247,6 +251,8 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
       email: String(email).toLowerCase().trim(),
       phone: (phone || "").trim(),
       password,
+      country: (country || "").trim(),
+      currency: (currency || "USD").trim(),
       roles: ["buyer"],
       isVerified: false,
       otp,
@@ -261,15 +267,6 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
       JWT_SECRET,
       { expiresIn: "15min" }
     );
-    guestUser = {
-      _id: newUser._id,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
-      email: newUser.email,
-      phone: newUser.phone,
-      verified: newUser.isVerified,
-      roles: newUser.roles
-    };
     userId = newUser._id;
   } else {
     userId = req.user._id;
@@ -293,14 +290,11 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   if (!description) { throw new AppError("Shop description is required", 400); }
   if (!category) { throw new AppError("Shop category is required", 400); }
 
-  const idDoc = Array.isArray(files.idDocument) ? files.idDocument[0] : files.idDocument;
-  const proofRes = Array.isArray(files.proofOfResidence) ? files.proofOfResidence[0] : files.proofOfResidence;
+  const nin = (body.nin || "").trim();
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
-  if (!idDoc || !idDoc.buffer) { throw new AppError("ID document is required", 400); }
-  if (!proofRes || !proofRes.buffer) { throw new AppError("Proof of residence is required", 400); }
-  if (!businessCacFile || !businessCacFile.buffer) { throw new AppError("Business CAC is required", 400); }
-  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
+  if (!nin) { throw new AppError("NIN is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Valid Identification is required", 400); }
 
   const foundUser = await User.findById(userId);
   if (!foundUser) { throw new AppError("User not found", 404); }
@@ -308,12 +302,16 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   const folderDocs = "daw/seller-documents";
   const folderShop = "daw/shops";
   const prefix = `seller_${userId.toString()}`;
-  const [idDocResult, proofResResult, cacResult, passportResult] = await Promise.all([
-    uploadBuffer(idDoc.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_id` }),
-    uploadBuffer(proofRes.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_proof` }),
-    uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }),
+
+  const uploadPromises = [
     uploadBuffer(passportPhoto.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_passport` })
-  ]);
+  ];
+  if (businessCacFile && businessCacFile.buffer) {
+    uploadPromises.push(uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }));
+  }
+  const uploadResults = await Promise.all(uploadPromises);
+  const passportResult = uploadResults[0];
+  const cacResult = uploadResults[1] || null;
 
   let logo_url = null;
   let banner_url = null;
@@ -328,27 +326,45 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
     banner_url = r.secure_url;
   }
 
-  const coopStoreUrl = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "") + "-" + Date.now();
+  // Reuse/update existing shop if the user already has one.
+  // This avoids intermittent duplicate-key failures from the unique owner_id index.
+  let shop = await Shop.findOne({ owner_id: userId });
 
-  const shopData = {
-    owner_id: userId,
-    cooperative_id: cooperativeId,
-    name,
-    store_url: coopStoreUrl,
-    description,
-    category,
-    contact_number: contactNumber,
-    business_address: businessAddress,
-    logo_url,
-    banner_url,
-    is_member_shop: true,
-    status: "active"
-  };
-  const shop = await marketplaceService.createShop(shopData);
-  if (!shop) { throw new AppError("Shop not created", 400); }
+  if (shop) {
+    shop.name = name;
+    shop.description = description;
+    shop.category = category;
+    shop.contact_number = contactNumber;
+    shop.business_address = businessAddress;
+    shop.cooperative_id = cooperativeId;
+    shop.is_member_shop = true;
+    shop.status = "active";
+    if (logo_url) { shop.logo_url = logo_url; }
+    if (banner_url) { shop.banner_url = banner_url; }
+    await shop.save();
+  } else {
+    const coopStoreUrl = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") + "-" + Date.now();
+
+    const shopData = {
+      owner_id: userId,
+      cooperative_id: cooperativeId,
+      name,
+      store_url: coopStoreUrl,
+      description,
+      category,
+      contact_number: contactNumber,
+      business_address: businessAddress,
+      logo_url,
+      banner_url,
+      is_member_shop: true,
+      status: "active"
+    };
+    shop = await marketplaceService.createShop(shopData);
+    if (!shop) { throw new AppError("Shop not created", 400); }
+  }
 
   const currentRoles = Array.isArray(foundUser.roles) ? foundUser.roles : [];
   if (!currentRoles.includes("seller")) { currentRoles.push("seller"); }
@@ -359,10 +375,9 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
 
   const sellerDoc = await SellerDocuments.create({
     user_id: userId,
-    id_document_url: idDocResult.secure_url,
-    proof_of_residence_url: proofResResult.secure_url,
-    business_cac_url: cacResult.secure_url,
+    nin,
     passport_photograph_url: passportResult.secure_url,
+    business_cac_url: cacResult ? cacResult.secure_url : null,
     status: "pending"
   });
 
@@ -373,6 +388,13 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
   });
 
   const isGuest = !req.user || !req.user._id;
+
+  // Fetch the updated user so frontend can sync roles
+  const updatedUser = await User.findById(userId)
+    .select("firstName lastName email phone roles isVerified status shop avatar")
+    .populate("shop", "_id name")
+    .lean();
+
   res.status(201).json({
     success: true,
     message: isGuest
@@ -381,7 +403,8 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
     member,
     shop: { _id: shop._id, name: shop.name, status: shop.status },
     sellerDocuments: { _id: sellerDoc._id, status: sellerDoc.status },
-    ...(isGuest ? { token: guestTempToken, user: guestUser } : {})
+    ...(isGuest ? { token: guestTempToken } : {}),
+    user: updatedUser,
   });
 });
 
@@ -391,17 +414,17 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
  * Optional auth: if no token, treat as guest (require firstName, lastName, email, phone, password, confirmPassword).
  * Body: firstName?, lastName?, email?, phone?, password?, confirmPassword? (guest);
  *       name|shopName, description, category, contactNumber?, businessAddress?
- * Files: shopLogo?, shopBanner?, idDocument, proofOfResidence, businessCac, passportPhotograph
+ * Files: shopLogo?, shopBanner?, passportPhotograph, businessCac?
+ * Body also includes: nin (required)
  */
 const guestSellerOnboard = asyncHandler(async (req, res) => {
   const body = req.body || {};
   const files = req.files || {};
   let userId;
-  let guestUser = null;
   let guestTempToken = null;
 
   if (!req.user || !req.user._id) {
-    const { firstName, lastName, email, phone, password, confirmPassword } = body;
+    const { firstName, lastName, email, phone, password, confirmPassword, country, currency } = body;
     if (!email || !password || !confirmPassword || !firstName || !phone) {
       throw new AppError("email, password, confirmPassword, firstName, and phone are required for guest", 400);
     }
@@ -421,6 +444,8 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
       email: String(email).toLowerCase().trim(),
       phone: (phone || "").trim(),
       password,
+      country: (country || "").trim(),
+      currency: (currency || "USD").trim(),
       roles: ["buyer"],
       isVerified: false,
       otp,
@@ -435,27 +460,9 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
       JWT_SECRET,
       { expiresIn: "15min" }
     );
-    guestUser = {
-      _id: newUser._id,
-      firstName: newUser.firstName,
-      lastName: newUser.lastName,
-      email: newUser.email,
-      phone: newUser.phone,
-      verified: newUser.isVerified,
-      roles: newUser.roles
-    };
     userId = newUser._id;
   } else {
     userId = req.user._id;
-  }
-
-  const cooperativeId = (body.cooperativeId || "").trim();
-  const subscriptionTierId = (body.subscriptionTierId || "").trim();
-  if (!cooperativeId || !mongoose.Types.ObjectId.isValid(cooperativeId)) {
-    throw new AppError("Valid cooperativeId is required", 400);
-  }
-  if (!subscriptionTierId || !mongoose.Types.ObjectId.isValid(subscriptionTierId)) {
-    throw new AppError("Valid subscriptionTierId is required", 400);
   }
 
   const name = (body.name || body.shopName || "").trim();
@@ -467,14 +474,11 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
   if (!description) { throw new AppError("Shop description is required", 400); }
   if (!category) { throw new AppError("Shop category is required", 400); }
 
-  const idDoc = Array.isArray(files.idDocument) ? files.idDocument[0] : files.idDocument;
-  const proofRes = Array.isArray(files.proofOfResidence) ? files.proofOfResidence[0] : files.proofOfResidence;
+  const nin = (body.nin || "").trim();
   const businessCacFile = Array.isArray(files.businessCac) ? files.businessCac[0] : files.businessCac;
   const passportPhoto = Array.isArray(files.passportPhotograph) ? files.passportPhotograph[0] : files.passportPhotograph;
-  if (!idDoc || !idDoc.buffer) { throw new AppError("ID document is required", 400); }
-  if (!proofRes || !proofRes.buffer) { throw new AppError("Proof of residence is required", 400); }
-  if (!businessCacFile || !businessCacFile.buffer) { throw new AppError("Business CAC is required", 400); }
-  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Passport photograph is required", 400); }
+  if (!nin) { throw new AppError("NIN is required", 400); }
+  if (!passportPhoto || !passportPhoto.buffer) { throw new AppError("Valid Identification is required", 400); }
 
   const foundUser = await User.findById(userId);
   if (!foundUser) { throw new AppError("User not found", 404); }
@@ -482,12 +486,16 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
   const folderDocs = "daw/seller-documents";
   const folderShop = "daw/shops";
   const prefix = `seller_${userId.toString()}`;
-  const [idDocResult, proofResResult, cacResult, passportResult] = await Promise.all([
-    uploadBuffer(idDoc.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_id` }),
-    uploadBuffer(proofRes.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_proof` }),
-    uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }),
+
+  const uploadPromises = [
     uploadBuffer(passportPhoto.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_passport` })
-  ]);
+  ];
+  if (businessCacFile && businessCacFile.buffer) {
+    uploadPromises.push(uploadBuffer(businessCacFile.buffer, { folder: folderDocs, publicIdPrefix: `${prefix}_cac` }));
+  }
+  const uploadResults = await Promise.all(uploadPromises);
+  const passportResult = uploadResults[0];
+  const cacResult = uploadResults[1] || null;
 
   let logo_url = null;
   let banner_url = null;
@@ -502,23 +510,22 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
     banner_url = r.secure_url;
   }
 
-  const coopStoreUrl = name
+  const storeUrl = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "") + "-" + Date.now();
 
   const shopData = {
     owner_id: userId,
-    cooperative_id: null,
     name,
-    store_url: coopStoreUrl,
+    store_url: storeUrl,
     description,
     category,
     contact_number: contactNumber,
     business_address: businessAddress,
     logo_url,
     banner_url,
-    is_member_shop: true,
+    is_member_shop: false,
     status: "active"
   };
   const shop = await marketplaceService.createShop(shopData);
@@ -533,29 +540,31 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
 
   const sellerDoc = await SellerDocuments.create({
     user_id: userId,
-    id_document_url: idDocResult.secure_url,
-    proof_of_residence_url: proofResResult.secure_url,
-    business_cac_url: cacResult.secure_url,
+    nin,
     passport_photograph_url: passportResult.secure_url,
+    business_cac_url: cacResult ? cacResult.secure_url : null,
     status: "pending"
   });
 
-  const member = await MemberService.joinCooperative({
-    userId,
-    cooperativeId,
-    subscriptionTierId
-  });
-
   const isGuest = !req.user || !req.user._id;
+  // Build user object with the UPDATED roles (after seller role was added)
+  const updatedUser = {
+    _id: foundUser._id,
+    firstName: foundUser.firstName,
+    lastName: foundUser.lastName,
+    email: foundUser.email,
+    phone: foundUser.phone,
+    roles: foundUser.roles,
+    shop: foundUser.shop
+  };
   res.status(201).json({
     success: true,
     message: isGuest
-      ? "Account created, seller onboarded, and joined cooperative. OTP sent to email for verification."
-      : "Seller onboarded and joined cooperative.",
-    member,
+      ? "Account created and seller onboarded. OTP sent to email for verification."
+      : "Seller onboarded successfully.",
     shop: { _id: shop._id, name: shop.name, status: shop.status },
     sellerDocuments: { _id: sellerDoc._id, status: sellerDoc.status },
-    ...(isGuest ? { token: guestTempToken, user: guestUser } : {})
+    ...(isGuest ? { token: guestTempToken, user: updatedUser } : { user: updatedUser })
   });
 });
 
@@ -565,7 +574,8 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
  * Optional auth: if no token, treat as guest (require firstName, lastName, email, phone, password, confirmPassword).
  * Body: firstName?, lastName?, email?, phone?, password?, confirmPassword? (guest);
  *       name|shopName, description, category, contactNumber?, businessAddress?
- * Files: shopLogo?, shopBanner?, idDocument, proofOfResidence, businessCac, passportPhotograph
+ * Files: shopLogo?, shopBanner?, passportPhotograph, businessCac?
+ * Body also includes: nin (required)
  */
 
 
@@ -755,7 +765,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
 const getProduct = async (req, res) => {
   try {
     const { productId } = req.params;
-    const productView = await marketplaceService.getProductById(productId);
+    const productView = await marketplaceService.getProductById(productId, req.user);
     if (!productView) {
       return res.status(404).json({
         message: "product not found"
@@ -777,7 +787,7 @@ const getProduct = async (req, res) => {
 // Get products by shop
 const getProductsByShop = asyncHandler(async (req, res) => {
   const { shop_id } = req.params;
-  const products = await marketplaceService.getProductsByShop(shop_id);
+  const products = await marketplaceService.getProductsByShop(shop_id, req.user);
   res.status(200).json({ success: true, products });
 });
 
@@ -827,7 +837,7 @@ const getoRdersById = asyncHandler(async (req, res) => {
 
 const getAllProduct = asyncHandler(async (req, res) => {
   try {
-    const products = await marketplaceService.getAllProduct();
+    const products = await marketplaceService.getAllProduct(req.user);
     if (!products) {
       return res.status(400).json({
         message: "No products available"
@@ -871,16 +881,9 @@ const getOrdersByShop = asyncHandler(async (req, res) => {
   }
   const orders = await marketplaceService.getOrdersByShopId(shop_id);
 
-  if (!orders || orders.length === 0) {
-    return res.status(404).json({
-      success: false,
-      message: "No orders found for this shop"
-    });
-  }
-
-  return res.status(200).json({
+  res.status(200).json({
     success: true,
-    orders
+    orders: orders || [],
   });
 });
 

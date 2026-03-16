@@ -44,6 +44,15 @@ const PaymentSchema = new mongoose.Schema(
       ref: "User"
     },
     shopName: String,
+    contributionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Contribution"
+    },
+    paymentType: {
+      type: String,
+      enum: ["order", "contribution", "loan_repayment"],
+      default: "order"
+    },
     name: String,
     email: String,
     phone: String,

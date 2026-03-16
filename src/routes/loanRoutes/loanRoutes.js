@@ -5,7 +5,9 @@ const {
   rejectLoan,
   listMemberLoans,
   getLoanStats,
-  listCooperativeLoans
+  listCooperativeLoans,
+  getEligibleLoanTiers,
+  listMyLoans
 } = require("../../controllers/Loan/loan.controller.js");
 const { protect, restrictTo } = require("@middlewares/authMiddleware.js");
 
@@ -41,6 +43,10 @@ router.put(
 );
 
 // --- Member-scoped ---
+router.get("/eligibility", protect, getEligibleLoanTiers);
+router.get("/history", protect, listMyLoans);
+router.get("/member/:memberId/eligibility", protect, getEligibleLoanTiers); // kept for admin/compat if needed, or remove? I'll just change the main one for seller.
+
 router.get("/member/:memberId", protect, listMemberLoans);
 
 module.exports = router;
