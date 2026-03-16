@@ -3,6 +3,7 @@ const Payment = require("@models/paymentModel/payment.model.js");
 const User = require("@models/userModel/user.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const AppError = require("@utils/Error/AppError.js");
+const Shop = require("@models/marketPlace/shopModel.js");
 
 const getAccessToken = async () => {
   const credentials = Buffer.from(
@@ -62,6 +63,10 @@ exports.createOrder = async (req, res) => {
       throw new AppError("Invalid or already paid order", 400);
     }
 
+    const shop = await Shop.findById(order.shop_id);
+    if (!shop) {
+      throw new AppError("Shop not found for this order", 404);
+    }
     const amount = order.total_amount;
 
     // PayPal works in the order currency; default to USD for international payments
@@ -121,6 +126,9 @@ exports.createOrder = async (req, res) => {
       userId: user._id,
       orderId: order._id.toString(),
       amount,
+      shopId: shop._id,
+      shopOwnerId: shop.owner_id,
+      shopName: shop.name ||"N/A",
       description: description || "Order Payment",
       currency,
       channel: "paypal",
