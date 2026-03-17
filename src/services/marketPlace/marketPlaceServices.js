@@ -301,13 +301,25 @@ const getOrdersById = async (orderId) => {
 // PRODUCTS
 async function getAllProduct(reqUser) {
   try {
-    const products = await Product.find().populate("shop_id", "name").lean();
+    const products = await Product.find()
+      .populate({
+        path: "shop_id",
+        select: "name owner_id logo_url",
+        populate: {
+          path: "owner_id",
+          select: "firstName lastName email"
+        }
+      })
+      .lean();
 
     const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
 
     return products.map(product => ({
       ...product,
       shop_name: product.shop_id?.name || "",
+      shop_logo: product.shop_id?.logo_url || "",
+      seller_name: product.shop_id?.owner_id ? `${product.shop_id.owner_id.firstName} ${product.shop_id.owner_id.lastName}` : "Unknown",
+      seller_email: product.shop_id?.owner_id?.email || "",
       shop_id: product.shop_id?._id || product.shop_id,
       displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
       displayCurrency: userCurrency
