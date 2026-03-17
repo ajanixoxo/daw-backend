@@ -2,6 +2,10 @@ const express = require("express");
 const router = express.Router();
 const { getDashboardStats, getPendingCooperatives, getAllUsers, getAnalyticsData, getUserAnalytics, getCooperativeAnalytics, getRevenueAnalytics } = require("../../controllers/admin/dashboard.controller.js");
 const asyncHandler = require("express-async-handler");
+const { protect, restrictTo } = require("@middlewares/authMiddleware.js");
+
+router.use(protect);
+router.use(restrictTo("admin", "support-admin"));
 
 
 // GET /api/admin/dashboard/stats
