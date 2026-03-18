@@ -2,6 +2,7 @@ const vigipayClient = require("../../utils/vigipayClient/vigipayClient.js");
 const User = require("../../models/userModel/user.js");
 const walletLedger = require("../../models/walletLedger/ledger.js");
 const crypto = require("crypto");
+const redisClient = require("../../utils/redisClient.js");
 
 exports.createStatic = async (req, res) => {
   try {
@@ -65,6 +66,22 @@ exports.getBusinessWallet = async (req, res) => {
       });
     }
 
+    const CACHE_KEY = `wallet_balance_ADMIN_${userId}`;
+    try {
+      const cachedBalance = await redisClient.get(CACHE_KEY);
+      if (cachedBalance !== null) {
+        console.log("Serving wallet balance from Redis cache");
+
+        return res.status(200).json({
+          success: true,
+          message: "Response fetched successfully",
+          response: JSON.parse(cachedBalance) 
+        });
+      }
+    } catch (cacheErr) {
+      console.error("Redis cache error:", cacheErr);
+    }
+
     console.log("vigipay starting");
     const response = await vigipayClient.get("/api/Wallet/businessWallet");
     console.log("response for wallet from vigipay", response);
@@ -79,7 +96,13 @@ exports.getBusinessWallet = async (req, res) => {
     user.wallet_balance = currentBalance;
 
     await user.save();
-
+    
+    try {
+      await redisClient.set(CACHE_KEY, JSON.stringify(response.data.responseData), "EX", 3600);
+    } catch (cacheErr) {
+      console.error("Redis set error:", cacheErr);
+    }
+    
     return res.status(200).json({
       message: "Wallet retrieved successfully",
       data: response.data.responseData
@@ -225,7 +248,19 @@ exports.processPayout = async (req, res) => {
         seller.account_Balance = Math.max(0, (seller.account_Balance || 0) - amount);
         await seller.save();
         console.log(`Deducted ${amount} from seller ${sellerId} account_Balance after payout.`);
+        
+        try {
+          await redisClient.del(`wallet_balance_${sellerId}`);
+        } catch (cacheErr) {
+          console.error("Redis del error:", cacheErr);
+        }
       }
+    }
+
+    try {
+      await redisClient.del(`wallet_balance_ADMIN_${userId}`);
+    } catch (cacheErr) {
+      console.error("Redis del error:", cacheErr);
     }
 
     return res.status(200).json({
@@ -331,17 +366,45 @@ exports.getAccount = async (req, res) => {
     }
 
     console.log("seller details", user);
+    
+
+    const CACHE_KEY = `wallet_balance_${userId}`;
+    try {
+      const cachedBalance = await redisClient.get(CACHE_KEY);
+      if (cachedBalance !== null) {
+        console.log("Serving wallet balance from Redis cache");
+
+        return res.status(200).json({
+          success: true,
+          message: "Response fetched successfully",
+          response: JSON.parse(cachedBalance) 
+        });
+      }
+    } catch (cacheErr) {
+      console.error("Redis cache error:", cacheErr);
+    }
 
     const response = await vigipayClient(
       `/api/VirtualAccount/get?accountId=${user.accountId}`
     );
-
+    // console.log("response from vigipay", response);
+    console.log(
+  "Vigipay responseData:",
+  JSON.stringify(response?.data?.responseData, null, 2)
+);
     // console.log("response", response);
 
     user.account_Balance =
       response.data.responseData.accountBalance;
-
     await user.save();
+
+    try {
+      console.log("saving into redis...");
+      await redisClient.set(CACHE_KEY, JSON.stringify(response.data.responseData));
+      // Optional expiration could be set here
+    } catch (cacheErr) {
+      console.error("Redis cache set error:", cacheErr);
+    }
 
     return res.status(200).json({
       success: true,
@@ -484,6 +547,12 @@ exports.payFromStaticWallet = async (req, res) => {
     ledger.status = "SUCCESS";
     ledger.rawWebhookPayload = transferRes.data;
     await ledger.save();
+
+    try {
+      await redisClient.del(`wallet_balance_${user._id}`);
+    } catch (cacheErr) {
+      console.error("Redis del error:", cacheErr);
+    }
 
     return res.status(200).json({
       success: true,
