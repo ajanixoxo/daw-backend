@@ -6,6 +6,8 @@ const ShopView = require("@models/marketPlace/shopViewModel.js");
 const User = require("@models/userModel/user.js");
 const AppError = require("@utils/Error/AppError.js");
 const { convertPrice } = require("@utils/currency/currencyHandler.js");
+const LogisticsProvider = require("@models/marketPlace/logisticsProviderModel.js");
+const { deliveryAssignedEmailTemplate } = require("@utils/EmailTemplate/template.js");
 const mongoose = require("mongoose");
 
 // SHOP — one shop per user (business rule)
@@ -274,6 +276,22 @@ const createOrder = async (buyer_id, items) => {
       payment_status: "unpaid",
       escrow_status: "pending"
     });
+
+    // Auto-assign to an active logistics provider
+    const provider = await LogisticsProvider.findOne({ status: "active" }).populate("user_id");
+    if (provider) {
+      order.logistics_id = provider._id;
+      await order.save();
+
+      if (provider.user_id && provider.user_id.email) {
+        // Send email notification without awaiting to avoid blocking order creation flow
+        deliveryAssignedEmailTemplate(
+          provider.user_id.email, 
+          provider.businessName || provider.user_id.firstName, 
+          order._id.toString()
+        ).catch(err => console.error("Failed to send delivery email:", err));
+      }
+    }
 
     const finalItems = orderItems.map(i => ({
       ...i,

@@ -48,8 +48,25 @@ const forgotPasswordOTPEmailTemplate = asyncHandler(async(email, firstName, otp)
   await sendEmail(email, subject, html);
   console.log("forgot password OTP email sent to:", email);
 });
+const deliveryAssignedEmailTemplate = asyncHandler(async(email, name, orderId) => {
+  const subject = "New Delivery Order Assigned - Digital African Women";
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2 style="color: #333;">New Delivery Assigned</h2>
+      <p>Dear ${name},</p>
+      <p>A new order has been placed and assigned to you for delivery. The Shipment ID is:</p>
+      <h3 style="background-color: #f4f4f4; padding: 10px; border-radius: 5px; display: inline-block;">${orderId}</h3>
+      <p>Please log in to your logistics dashboard to view the delivery details and update its status.</p>
+      <p>Best regards,<br/>The Digital African Women Team</p>
+    </div>
+  `;
+  await sendEmail(email, subject, html);
+  console.log("New delivery email sent to:", email);
+});
+
 module.exports ={
   verificationEmailTemplate,
   loginOTPEmailTemplate,
-  forgotPasswordOTPEmailTemplate
+  forgotPasswordOTPEmailTemplate,
+  deliveryAssignedEmailTemplate
 };
