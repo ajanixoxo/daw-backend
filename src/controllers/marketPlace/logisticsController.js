@@ -98,15 +98,13 @@ exports.getMyEarnings = async (req, res) => {
     }).lean();
 
     const totalDeliveries = deliveredOrders.length;
-    // Platform takes 10% — logistics provider earns a flat delivery fee
-    // For simplicity: earnings = 10% of total_amount per delivered order (delivery fee model)
-    const DELIVERY_FEE_RATE = 0.10;
-
+    // Logistics provider earns the exact flat delivery fee applied to the order
+    
     let totalEarnings = 0;
     const monthlyMap = {};
 
     for (const order of deliveredOrders) {
-      const fee = order.total_amount * DELIVERY_FEE_RATE;
+      const fee = order.delivery_fee || 0;
       totalEarnings += fee;
 
       const month = new Date(order.updatedAt).toLocaleString("default", { month: "short", year: "numeric" });
@@ -114,14 +112,14 @@ exports.getMyEarnings = async (req, res) => {
     }
 
     const avgPerDelivery = totalDeliveries > 0 ? totalEarnings / totalDeliveries : 0;
-    const platformFee = totalEarnings * 0.10;
+    const platformFee = totalEarnings * 0.10; // e.g. platform takes a 10% commission on the delivery
     const netEarnings = totalEarnings - platformFee;
 
     // Active (pending payout) — deliveries in the last 7 days
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const recentEarnings = deliveredOrders
       .filter((o) => new Date(o.updatedAt) > sevenDaysAgo)
-      .reduce((sum, o) => sum + o.total_amount * DELIVERY_FEE_RATE, 0);
+      .reduce((sum, o) => sum + (o.delivery_fee || 0), 0);
 
     const monthlyChart = Object.entries(monthlyMap).map(([month, amount]) => ({ month, amount }));
 
