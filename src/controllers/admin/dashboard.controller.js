@@ -19,27 +19,10 @@ const getDashboardStats = asyncHandler(async (req, res) => {
   const activeUsersCount = await User.countDocuments();
 
   // 2. Cooperatives Stats
-  // Pending Cooperatives = Cooperatives where the Admin's KYC is pending
-  const pendingCooperativesAgg = await Cooperative.aggregate([
-    {
-      $lookup: {
-        from: "users", // ensure this matches your actual collection name in MongoDB (usually lowercase plural)
-        localField: "adminId",
-        foreignField: "_id",
-        as: "admin"
-      }
-    },
-    { $unwind: "$admin" },
-    {
-      $match: {
-        "admin.kyc_status": { $ne: "verified" } // Pending if not verified (covers 'pending' and 'rejected' or null)
-      }
-    },
-    { $count: "count" }
-  ]);
-  const pendingCooperativesCount = pendingCooperativesAgg.length > 0 ? pendingCooperativesAgg[0].count : 0;
-
   const totalCooperativesCount = await Cooperative.countDocuments();
+  
+  // 3. Pending Loans Stats
+  const pendingLoansCount = await Loan.countDocuments({ status: "pending" });
 
   // 3. Products Stats
   const activeProductsCount = await Product.countDocuments({ status: "available" });
@@ -80,7 +63,6 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       },
       cooperatives: {
         total: totalCooperativesCount,
-        pending: pendingCooperativesCount,
         label: "Cooperatives"
       },
       products: {
@@ -93,7 +75,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
         label: "Total Loans Disbursed"
       },
       pendingApprovals: {
-        value: pendingCooperativesCount,
+        value: pendingLoansCount,
         label: "Pending Approvals"
       },
       // Add new stats
@@ -151,6 +133,24 @@ const getPendingCooperatives = asyncHandler(async (req, res) => {
     success: true,
     count: pendingCoops.length,
     data: pendingCoops
+  });
+});
+
+/**
+ * Get Pending Loans List
+ * GET /api/admin/dashboard/loans/pending
+ */
+const getPendingLoans = asyncHandler(async (req, res) => {
+  const pendingLoans = await Loan.find({ status: "pending" })
+    .populate("userId", "firstName lastName email")
+    .populate("cooperativeId", "name")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  res.status(200).json({
+    success: true,
+    count: pendingLoans.length,
+    data: pendingLoans
   });
 });
 
@@ -702,5 +702,6 @@ module.exports = {
   getAnalyticsData,
   getUserAnalytics,
   getCooperativeAnalytics,
-  getRevenueAnalytics
+  getRevenueAnalytics,
+  getPendingLoans
 };
