@@ -53,24 +53,28 @@ exports.createOrder = async (req, res) => {
       throw new AppError("Order ID is required", 400);
     }
 
-    // Fetch the order and make sure it belongs to the requesting buyer and is unpaid
-    const order = await Order.findOne({
-      _id: orderId,
+    const orderIdList = orderId.split(",");
+    const orders = await Order.find({
+      _id: { $in: orderIdList },
       buyer_id: userId,
       payment_status: "unpaid"
     });
-    if (!order) {
-      throw new AppError("Invalid or already paid order", 400);
+
+    if (!orders || orders.length === 0) {
+      throw new AppError("No valid or unpaid orders found", 400);
     }
 
-    const shop = await Shop.findById(order.shop_id);
-    if (!shop) {
-      throw new AppError("Shop not found for this order", 404);
-    }
-    const amount = order.total_amount;
+    const { convertPrice } = require("@utils/currency/currencyHandler.js");
+    
+    // Sum total for all orders
+    const totalAmountNGN = orders.reduce((sum, o) => sum + o.total_amount, 0);
+    const amountInUSD = convertPrice(totalAmountNGN, "NGN", "USD");
 
-    // PayPal works in the order currency; default to USD for international payments
-    const currency = process.env.PAYPAL_CURRENCY || "USD";
+    // Use first shop for payment record (or skip if multiple)
+    const shop = await Shop.findById(orders[0].shop_id);
+    const amount = amountInUSD;
+
+    const currency = "USD";
 
     const accessToken = await getAccessToken();
 
@@ -79,11 +83,11 @@ exports.createOrder = async (req, res) => {
       intent: "CAPTURE",
       purchase_units: [
         {
-          reference_id: order._id.toString(),
+          reference_id: orders[0]._id.toString(),
           description: description || "Order Payment",
           amount: {
             currency_code: currency,
-            value: amount.toFixed(2)
+            value: amountInUSD.toFixed(2)
           }
         }
       ],
@@ -124,11 +128,11 @@ exports.createOrder = async (req, res) => {
     // Persist a pending payment record
     const payment = await Payment.create({
       userId: user._id,
-      orderId: order._id.toString(),
-      amount,
+      orderId: orderId, // Store all order IDs (comma-separated if needed)
+      amount: amountInUSD,
       shopId: shop._id,
       shopOwnerId: shop.owner_id,
-      shopName: shop.name ||"N/A",
+      shopName: shop.name || "N/A",
       description: description || "Order Payment",
       currency,
       channel: "paypal",

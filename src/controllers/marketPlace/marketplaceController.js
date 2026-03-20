@@ -815,12 +815,14 @@ const createOrder = asyncHandler(async (req, res) => {
     throw new AppError("User not found", 404);
   }
   
-  const { order, orderItems } =
+  const { order, orders, orderItems } =
     await marketplaceService.createOrder(buyer_id, items);
 
   res.status(201).json({
     success: true,
     order,
+    orders,
+    orderIds: orders.map(o => o._id),
     orderItems
   });
 });
