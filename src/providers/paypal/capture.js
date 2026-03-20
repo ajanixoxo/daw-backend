@@ -4,6 +4,8 @@ const Order = require("@models/marketPlace/orderModel.js");
 const User = require("@models/userModel/user.js");
 const Shop = require("@models/marketPlace/shopModel.js");
 const WalletLedger = require("@models/walletLedger/ledger.js");
+const LogisticsProvider = require("@models/marketPlace/logisticsProviderModel.js");
+const { deliveryAssignedEmailTemplate } = require("@utils/EmailTemplate/template.js");
 
 
 
@@ -100,15 +102,65 @@ exports.captureOrder = async (req, res) => {
 
 
 
-      await Order.findByIdAndUpdate(payment.orderId, {
-        payment_status: "paid",
-        escrow_status: "held",
-        status: "processing"
-      });
+      // 🔹 Handle multiple orders if present
+      const orderIdList = payment.orderId.split(",");
       
-      //updating seller pending balance
+      for (const currentOrderId of orderIdList) {
+        const trimmedOrderId = currentOrderId.trim();
+        await Order.findByIdAndUpdate(trimmedOrderId, {
+          payment_status: "paid",
+          escrow_status: "held",
+          status: "processing"
+        });
+
+        // 🔹 Logistics assignment and notification for each order
+        try {
+          const orderData = await Order.findById(trimmedOrderId);
+          if (orderData) {
+            let provider;
+            if (!orderData.logistics_id) {
+              provider = await LogisticsProvider.findOne({ status: "active" }).populate("user_id");
+              if (provider) {
+                orderData.logistics_id = provider._id;
+                await orderData.save();
+              }
+            } else {
+              provider = await LogisticsProvider.findById(orderData.logistics_id).populate("user_id");
+            }
+
+            if (provider && provider.user_id?.email) {
+              deliveryAssignedEmailTemplate(
+                provider.user_id.email,
+                provider.businessName || provider.user_id.firstName,
+                orderData._id.toString()
+              ).catch(err => console.error("Failed to send delivery email:", err));
+            }
+          }
+        } catch (logisticsErr) {
+          console.error("Logistics assignment/notification error:", logisticsErr.message);
+        }
+
+        // 🔹 Update seller pending balance for each order
+        try {
+          const order = await Order.findById(trimmedOrderId);
+          if (order?.shop_id) {
+            const shop = await Shop.findById(order.shop_id);
+            if (shop?.owner_id) {
+              const seller = await User.findById(shop.owner_id);
+              if (seller) {
+                seller.pending_amount = (seller.pending_amount || 0) + order.total_amount;
+                await seller.save();
+                console.log(`Seller ${seller._id} pending updated for order ${order._id}`);
+              }
+            }
+          }
+        } catch (sellerErr) {
+          console.error("Seller update error:", sellerErr.message);
+        }
+      }
+      
+      // 🔹 Create wallet ledger entry for the overall transaction
       try {
-        //find shop name for ledger entry
         const shop = await Shop.findById(payment.shopId);
         const user = await User.findById(payment.userId);
 
@@ -136,37 +188,6 @@ exports.captureOrder = async (req, res) => {
         console.log(`Wallet ledger created for ${paypalOrderId}`);
       } catch (ledgerErr) {
         console.error("Wallet ledger error:", ledgerErr.message);
-      }
-     
-      //update seller pending balance
-      try {
-
-        const order = await Order.findById(payment.orderId);
-
-        if (order?.shop_id) {
-
-          const shop = await Shop.findById(order.shop_id);
-
-          if (shop?.owner_id) {
-
-            const seller = await User.findById(shop.owner_id);
-
-            if (seller) {
-
-              seller.pending_amount =
-                (seller.pending_amount || 0) + payment.amount;
-
-              await seller.save();
-
-              console.log(
-                `Seller ${seller._id} pending updated`
-              );
-            }
-          }
-        }
-
-      } catch (sellerErr) {
-        console.error("Seller update error:", sellerErr.message);
       }
 
 

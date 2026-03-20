@@ -209,98 +209,93 @@ const deleteProduct = async ({ sellerId, productId }) => {
 // ORDER
 const createOrder = async (buyer_id, items) => {
   try {
-    let total_amount = 0;
-    const orderItems = [];
-    const updatedProducts = [];
-    let derivedShopId = null;
+    if (!items || items.length === 0) {
+      throw new AppError("No items provided", 400);
+    }
 
-    console.log("Starting order creation...");
-
-    for (let index = 0; index < items.length; index++) {
-      const item = items[index];
-
+    // 1. Group items by shop_id
+    const shopGroups = {};
+    for (const item of items) {
       if (!item.product_id || !item.quantity || item.quantity <= 0) {
         throw new AppError("Invalid item data", 400);
       }
 
       const product = await Product.findById(item.product_id);
-      if (!product) {throw new AppError("Product not found", 404);}
-
-      // 🔹 Derive shop_id from first product
-      if (index === 0) {
-        derivedShopId = product.shop_id;
-      }
-
-      // 🔹 Ensure all products belong to same shop
-      if (product.shop_id.toString() !== derivedShopId.toString()) {
-        throw new AppError("All products must belong to the same shop", 400);
+      if (!product) {
+        throw new AppError(`Product ${item.product_id} not found`, 404);
       }
 
       if (product.quantity < item.quantity) {
         throw new AppError(`Insufficient stock for ${product.name}`, 400);
       }
 
-      if (!product.price || product.price <= 0) {
-        throw new AppError(`Invalid price for ${product.name}`, 400);
+      const shopId = product.shop_id.toString();
+      if (!shopGroups[shopId]) {
+        shopGroups[shopId] = {
+          shop_id: shopId,
+          items: [],
+          total_amount: 0
+        };
       }
 
       const subtotal = product.price * item.quantity;
-      total_amount += subtotal;
+      shopGroups[shopId].total_amount += subtotal;
+      shopGroups[shopId].items.push({
+        product,
+        quantity: item.quantity,
+        price: product.price
+      });
+    }
 
-      orderItems.push({
-        product_id: product._id,
-        price: product.price,
-        quantity: item.quantity
+    const createdOrders = [];
+    const allCreatedItems = [];
+
+    // 2. Create an order for each shop group
+    for (const shopId of Object.keys(shopGroups)) {
+      const group = shopGroups[shopId];
+
+      const order = await Order.create({
+        buyer_id,
+        shop_id: group.shop_id,
+        total_amount: group.total_amount,
+        status: "pending",
+        payment_status: "unpaid",
+        escrow_status: "pending"
       });
 
-      const originalQuantity = product.quantity;
-      product.quantity -= item.quantity;
-      await product.save();
+      const orderItemsToCreate = group.items.map(item => ({
+        order_id: order._id,
+        product_id: item.product._id,
+        price: item.price,
+        quantity: item.quantity
+      }));
 
-      updatedProducts.push({ product, originalQuantity });
-    }
+      const createdItems = await OrderItem.insertMany(orderItemsToCreate);
 
-    if (total_amount <= 0) {
-      for (const { product, originalQuantity } of updatedProducts) {
-        product.quantity = originalQuantity;
-        await product.save();
+      // Decrement stock for each product
+      for (const item of group.items) {
+        item.product.quantity -= item.quantity;
+        await item.product.save();
       }
-      throw new AppError("Invalid total amount", 400);
-    }
 
-    const order = await Order.create({
-      buyer_id,
-      shop_id: derivedShopId,  
-      total_amount,
-      status: "pending",
-      payment_status: "unpaid",
-      escrow_status: "pending"
-    });
-
-    // Auto-assign to an active logistics provider
-    const provider = await LogisticsProvider.findOne({ status: "active" }).populate("user_id");
-    if (provider) {
-      order.logistics_id = provider._id;
-      await order.save();
-
-      if (provider.user_id && provider.user_id.email) {
-        // Send email notification without awaiting to avoid blocking order creation flow
-        deliveryAssignedEmailTemplate(
-          provider.user_id.email, 
-          provider.businessName || provider.user_id.firstName, 
-          order._id.toString()
-        ).catch(err => console.error("Failed to send delivery email:", err));
+      // Auto-assign logistics provider (best effort)
+      const provider = await LogisticsProvider.findOne({ status: "active" });
+      if (provider) {
+        order.logistics_id = provider._id;
+        await order.save();
       }
+
+      createdOrders.push(order);
+      allCreatedItems.push(...createdItems);
     }
 
-    const finalItems = orderItems.map(i => ({
-      ...i,
-      order_id: order._id
-    }));
-
-    const createdItems = await OrderItem.insertMany(finalItems);
-
-    return { order, orderItems: createdItems };
+    return {
+      orders: createdOrders,
+      orderItems: allCreatedItems,
+      // For backward compatibility with controllers expecting single objects
+      order: createdOrders[0],
+      orderId: createdOrders[0]._id
+    };
 
   } catch (error) {
     console.error("Error in createOrder:", error.message);
