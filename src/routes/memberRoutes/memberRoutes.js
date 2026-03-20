@@ -15,6 +15,10 @@ const router = express.Router();
 // CASE 3: Guest joins cooperative (no auth). Creates user + shop + member. If email exists → 400, ask to log in.
 router.post("/join/guest", guestJoin);
 
+const { getMyProfile, getMyDetails } = require("../../controllers/Member/member.controller.js");
+router.get("/me", protect, getMyProfile);
+router.get("/me/details", protect, getMyDetails);
+
 // Join cooperative: allowed for buyer (CASE 2) and seller (CASE 1). Guest use POST /join/guest.
 router.post("/join", protect, restrictTo("buyer", "seller"), join);
 router.put("/:id/approve", protect, restrictTo("admin", "cooperative", "member"), approve);

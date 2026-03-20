@@ -193,5 +193,12 @@ module.exports = {
         ordersCompleted
       }
     };
+  },
+
+  async getByUser(userId) {
+    return Member.findOne({ userId })
+      .populate("subscriptionTierId", "name monthlyContribution")
+      .populate("cooperativeId", "name")
+      .lean();
   }
 };
