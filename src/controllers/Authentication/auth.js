@@ -391,7 +391,7 @@ async function loginOTP(req, res) {
     const shopCount = await Shop.countDocuments({ owner_id: userId });
     const userObject = User.toObject();
     userObject.hasShop = shopCount > 0;
-
+    
     return res.json({
       message: "Login successful",
       token: {

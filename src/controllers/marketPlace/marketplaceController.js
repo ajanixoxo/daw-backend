@@ -595,7 +595,7 @@ const getShopById = asyncHandler(async (req, res) => {
 
 // Create a product (seller/admin)
 const createProduct = asyncHandler(async (req, res) => {
-  const { shop_id, name, quantity, price, category, description, status, variants, productFeatures, careInstruction, returnPolicy } = req.body;
+  const { shop_id, name, quantity, price, weight, location, category, description, status, variants, productFeatures, careInstruction, returnPolicy } = req.body;
 
   if (!shop_id) {
     throw new AppError("Shop ID is required", 400);
@@ -603,6 +603,12 @@ const createProduct = asyncHandler(async (req, res) => {
 
   if (!name) {
     throw new AppError("Product name is required", 400);
+  }
+  if (!weight) {
+    throw new AppError("Product weight is required", 400);
+  }
+  if (!location) {
+    throw new AppError("Product location is required", 400);
   }
 
   if (quantity === undefined || quantity === null) {
@@ -655,6 +661,8 @@ const createProduct = asyncHandler(async (req, res) => {
     sellerId: req.user._id,
     shopId: shop_id,
     name,
+    weight,
+    location,
     quantity,
     price,
     category,
@@ -673,7 +681,7 @@ const createProduct = asyncHandler(async (req, res) => {
 // Edit a product (seller/admin) — partial update, only dirty fields
 const editProduct = asyncHandler(async (req, res) => {
   const { productId } = req.params;
-  const { name, quantity, price, category, description, status, variants, productFeatures, careInstruction, returnPolicy, existingImages } = req.body;
+  const { name, quantity, price, weight, location, category, description, status, variants, productFeatures, careInstruction, returnPolicy, existingImages } = req.body;
 
   if (!productId) {
     throw new AppError("Product ID is required", 400);
@@ -723,6 +731,8 @@ const editProduct = asyncHandler(async (req, res) => {
   if (name !== undefined) { updates.name = name; }
   if (quantity !== undefined) { updates.quantity = Number(quantity); }
   if (price !== undefined) { updates.price = Number(price); }
+  if (weight !== undefined) { updates.weight = Number(weight); }
+  if (location !== undefined) { updates.location = location; }
   if (category !== undefined) { updates.category = category; }
   if (description !== undefined) { updates.description = description; }
   if (status !== undefined) { updates.status = status; }
@@ -1058,6 +1068,111 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   });
 });
 
+const calculateDeliveryFee = asyncHandler(async (req, res) => {
+  const { orderId, country, state } = req.body;
+  console.log(country, state, orderId)
+
+  if (!orderId || !country) {
+    throw new AppError("orderId and country are required", 400);
+  }
+
+  const OrderItem = require("@models/marketPlace/orderItemModel");
+  const Order = require("@models/marketPlace/orderModel");
+  const ShippingPricing = require("@models/marketPlace/shippingPricingModel");
+
+  const orderItems = await OrderItem.find({ order_id: orderId }).populate("product_id");
+  let totalWeight = 0;
+
+  for (const item of orderItems) {
+    const w = item.product_id?.weight || 1.0; 
+    totalWeight += (w * item.quantity);
+  }
+  
+  if (totalWeight === 0) totalWeight = 1.0; // fallback min weight
+
+  let deliveryFee = 0;
+
+  if (country.toLowerCase() === "nigeria") {
+    const isNorth = ["Kano", "Kaduna", "Borno", "Sokoto", "Katsina", "Niger", "Plateau", "Bauchi", "Jigawa", "Yobe", "Zamfara", "Kebbi", "Gombe", "Taraba", "Adamawa"].includes(state);
+    const regionType = isNorth ? "north" : "general";
+
+    // Round up the weight so 10.5kg becomes 11kg, falling into the 11-15kg bucket correctly
+    const roundedWeight = Math.ceil(totalWeight);
+
+    const rule = await ShippingPricing.findOne({
+      type: "national",
+      regionType,
+      // minWeight: { $lte: roundedWeight },
+      // maxWeight: { $gte: roundedWeight }
+    });
+
+    if (!rule) {
+      throw new AppError("No shipping rule found for this weight and region", 400);
+    }
+
+    deliveryFee = (rule.pickupFee || 0) + (rule.deliveryFee || 0);
+    if (rule.freightFee > 0) {
+      deliveryFee += rule.freightFee;
+    } else {
+      deliveryFee += (totalWeight * (rule.perKgRate || 0));
+    }
+  } else {
+    let weightTier = totalWeight <= 5 ? Math.ceil(totalWeight * 2) / 2 : Math.ceil(totalWeight);
+    if (weightTier < 0.5) weightTier = 0.5;
+
+    const rule = await ShippingPricing.findOne({
+      type: "international",
+      weight: weightTier
+    });
+
+    if (!rule) {
+      throw new AppError(`No international shipping rule found for weight ${weightTier}kg`, 400);
+    }
+
+    let region = "restOfAfrica";
+    const usaNames = ["United States", "USA"];
+    const canadaNames = ["Canada"];
+    const ukNames = ["United Kingdom", "UK", "England", "Scotland", "Wales", "Northern Ireland"];
+    const europeNames = ["France", "Germany", "Spain", "Italy", "Netherlands", "Belgium", "Austria", "Sweden", "Switzerland", "Poland", "Portugal", "Greece", "Ireland"];
+    const ausNames = ["Australia", "New Zealand"];
+    const asiaNames = ["China", "Japan", "India", "South Korea", "Singapore", "Malaysia", "Indonesia", "Vietnam", "Pakistan", "Bangladesh", "Thailand", "Philippines"];
+    const westAfricaNames = ["Ghana", "Benin", "Togo", "Cote d'Ivoire", "Senegal", "Mali", "Burkina Faso", "Gambia", "Guinea", "Sierra Leone", "Niger", "Mauritania"];
+    const farEuropeUAENames = ["United Arab Emirates", "Saudi Arabia", "Qatar", "Russia", "Kuwait", "Oman"];
+
+    if (usaNames.includes(country)) region = "usa";
+    else if (canadaNames.includes(country)) region = "canada";
+    else if (ukNames.includes(country)) region = "uk";
+    else if (europeNames.includes(country)) region = "europe";
+    else if (ausNames.includes(country)) region = "australia";
+    else if (asiaNames.includes(country)) region = "asia";
+    else if (westAfricaNames.includes(country)) region = "westAfrica";
+    else if (farEuropeUAENames.includes(country)) region = "farEuropeUAE";
+
+    deliveryFee = rule.prices[region];
+    if (deliveryFee === undefined) {
+       throw new AppError(`Shipping to ${country} is not supported yet`, 400);
+    }
+  }
+
+  // Update order with dynamic delivery fee
+  const order = await Order.findById(orderId);
+  if (order) {
+    // Avoid double counting if already added previously
+    if (order.delivery_fee !== deliveryFee) {
+      const difference = deliveryFee - (order.delivery_fee || 0);
+      order.delivery_fee = deliveryFee;
+      order.total_amount += difference;
+      await order.save();
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    deliveryFee,
+    totalAmount: order ? order.total_amount : undefined
+  });
+});
+
 module.exports = {
   createShop,
   sellerOnboard,
@@ -1081,5 +1196,6 @@ module.exports = {
   editShops,
   trackShopView,
   getShopStats,
-  updateOrderStatus
+  updateOrderStatus,
+  calculateDeliveryFee
 };

@@ -40,8 +40,10 @@ module.exports = {
   },
 
   async getAll(filter = {}) {
-    // you can expand pagination/filters later
-    return Cooperative.find(filter).sort({ createdAt: -1 }).lean();
+    return Cooperative.find(filter)
+      .populate("adminId", "firstName lastName email phone kyc_status")
+      .sort({ createdAt: -1 })
+      .lean();
   },
 
   async updateCooperative(id, data) {

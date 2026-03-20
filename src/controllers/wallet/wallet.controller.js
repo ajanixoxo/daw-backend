@@ -60,7 +60,7 @@ exports.getBusinessWallet = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    if (!user.roles.includes("admin")) {
+    if (!user.roles.includes("admin") && !user.roles.includes("support-admin")) {
       return res.status(400).json({
        message: "you are not eligible"
       });
@@ -438,7 +438,7 @@ exports.walletLedgerController = async (req, res) => {
 
     let filter = {};
 
-    if (user.roles && user.roles.includes("admin")) {
+    if (user.roles && (user.roles.includes("admin") || user.roles.includes("support-admin"))) {
       filter = {};
     }
     else {

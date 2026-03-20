@@ -21,7 +21,7 @@ const inviteUser = asyncHandler(async (req, res) => {
   const { firstName, lastName, email, phone, role, notes } = req.body;
 
   // Validate role
-  if (!["buyer", "seller", "member"].includes(role)) {
+  if (!["buyer", "seller", "member", "support-admin"].includes(role)) {
     res.status(400);
     throw new Error("Invalid role. Must be buyer, seller, or member.");
   }

@@ -6,6 +6,8 @@ const ShopView = require("@models/marketPlace/shopViewModel.js");
 const User = require("@models/userModel/user.js");
 const AppError = require("@utils/Error/AppError.js");
 const { convertPrice } = require("@utils/currency/currencyHandler.js");
+const LogisticsProvider = require("@models/marketPlace/logisticsProviderModel.js");
+const { deliveryAssignedEmailTemplate } = require("@utils/EmailTemplate/template.js");
 const mongoose = require("mongoose");
 
 // SHOP — one shop per user (business rule)
@@ -275,6 +277,22 @@ const createOrder = async (buyer_id, items) => {
       escrow_status: "pending"
     });
 
+    // Auto-assign to an active logistics provider
+    const provider = await LogisticsProvider.findOne({ status: "active" }).populate("user_id");
+    if (provider) {
+      order.logistics_id = provider._id;
+      await order.save();
+
+      if (provider.user_id && provider.user_id.email) {
+        // Send email notification without awaiting to avoid blocking order creation flow
+        deliveryAssignedEmailTemplate(
+          provider.user_id.email, 
+          provider.businessName || provider.user_id.firstName, 
+          order._id.toString()
+        ).catch(err => console.error("Failed to send delivery email:", err));
+      }
+    }
+
     const finalItems = orderItems.map(i => ({
       ...i,
       order_id: order._id
@@ -301,13 +319,25 @@ const getOrdersById = async (orderId) => {
 // PRODUCTS
 async function getAllProduct(reqUser) {
   try {
-    const products = await Product.find().populate("shop_id", "name").lean();
+    const products = await Product.find()
+      .populate({
+        path: "shop_id",
+        select: "name owner_id logo_url",
+        populate: {
+          path: "owner_id",
+          select: "firstName lastName email"
+        }
+      })
+      .lean();
 
     const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
 
     return products.map(product => ({
       ...product,
       shop_name: product.shop_id?.name || "",
+      shop_logo: product.shop_id?.logo_url || "",
+      seller_name: product.shop_id?.owner_id ? `${product.shop_id.owner_id.firstName} ${product.shop_id.owner_id.lastName}` : "Unknown",
+      seller_email: product.shop_id?.owner_id?.email || "",
       shop_id: product.shop_id?._id || product.shop_id,
       displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
       displayCurrency: userCurrency

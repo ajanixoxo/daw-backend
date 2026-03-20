@@ -24,7 +24,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "seed:shops": "node src/scripts/seedDemoShops.js",
-    "cleanup": "node src/scripts/cleanupOrphanedData.js"
+    "cleanup": "node src/scripts/cleanupOrphanedData.js",
+    "seed:logistics": "node scripts/shippingPricing.seed.js",
+    "seed:product": "node scripts/seed-product-weight-location.js"
   },
   "author": "",
   "license": "ISC",

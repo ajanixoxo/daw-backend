@@ -19,6 +19,8 @@ const productSchema = new mongoose.Schema({
   category: String,
   quantity: { type: Number, required: true },
   price: { type: Number, required: true },
+  weight: { type: Number, required: true },
+  location: { type: String, required: true, default: "Lagos, Nigeria" },
   images: [String],
   variants: [variantSchema],
   productFeatures: { type: String, default: "" },
