@@ -315,39 +315,24 @@ async function login(req, res) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    if (!User.isVerified) {
-      return res.status(400).json({ message: "Please verify your email" });
-    }
-
-    const otp = generateOTP();
-    User.otp = otp;
-    User.otpExpiry = Date.now() + 10 * 60 * 1000;
+    const { accessToken, refreshToken } = await User.generateToken();
+    User.refreshToken = refreshToken;
     await User.save();
 
-    await loginOTPEmailTemplate(email, User.firstName, otp);
-
-    const TempToken = jwt.sign(
-      { _id: User._id, email: User.email },
-      JWT_SECRET,
-      { expiresIn: "15min" }
-    );
-
     User.password = undefined;
-    User.otp = undefined;
-    User.otpExpiry = undefined;
+
+    // Check if user has any shops
+    const shopCount = await Shop.countDocuments({ owner_id: User._id });
+    const userObject = User.toObject();
+    userObject.hasShop = shopCount > 0;
 
     return res.status(200).json({
-      message: "OTP sent to email. Please verify OTP to complete login.",
-      user: {
-        _id: User._id,
-        firstName: User.firstName,
-        lastName: User.lastName,
-        email: User.email,
-        phone: User.phone,
-        verified: User.isVerified,
-        roles: User.roles
+      message: "Login successful",
+      token: {
+        accessToken,
+        refreshToken
       },
-      token: TempToken
+      user: userObject
     });
   } catch (error) {
     console.error("Error in login:", error);
