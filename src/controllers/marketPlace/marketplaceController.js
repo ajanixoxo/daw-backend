@@ -595,6 +595,8 @@ const getShopById = asyncHandler(async (req, res) => {
 
 // Create a product (seller/admin)
 const createProduct = asyncHandler(async (req, res) => {
+  console.log("createProduct req.body:", req.body);
+  console.log("createProduct req.files:", req.files?.length);
   const { shop_id, name, quantity, price, weight, location, category, description, status, variants, productFeatures, careInstruction, returnPolicy } = req.body;
 
   if (!shop_id) {
@@ -661,10 +663,10 @@ const createProduct = asyncHandler(async (req, res) => {
     sellerId: req.user._id,
     shopId: shop_id,
     name,
-    weight,
+    weight: Number(weight),
     location,
-    quantity,
-    price,
+    quantity: Number(quantity),
+    price: Number(price),
     category,
     description,
     images: imageUrls,
