@@ -428,7 +428,8 @@ async function forgotPassword(req, res) {
     const tempToken = jwt.sign(
       {
         _id: User._id,
-        email: User.email
+        email: User.email,
+        type: "password-reset"
       },
       JWT_SECRET,
       { expiresIn: "15min" }
@@ -446,7 +447,12 @@ async function forgotPassword(req, res) {
 
 async function resetPassword(req, res) {
   try {
-    const userId = req.user._id;
+    const { _id, type } = req.user;
+    
+    if (type !== "password-reset") {
+      return res.status(401).json({ message: "Invalid token type for password reset" });
+    }
+
     const { otp, newPassword, confirmNewPassword } = req.body;
     if (!otp || !newPassword || !confirmNewPassword) {
       return res.status(400).json({ message: "All fields are required" });
@@ -455,7 +461,7 @@ async function resetPassword(req, res) {
       return res.status(400).json({ message: "Passwords must match" });
     }
     const User = await user
-      .findById(userId)
+      .findById(_id)
       .select("+otp +otpExpiry +password");
     if (!User) {
       return res.status(404).json({ message: "User not found" });

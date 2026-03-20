@@ -197,6 +197,27 @@ const guestJoin = async (req, res) => {
   }
 };
 
+const getMyProfile = async (req, res) => {
+  try {
+    const member = await MemberService.getByUser(req.user._id);
+    if (!member) return res.status(404).json({ error: "Member profile not found" });
+    return res.json(member);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+const getMyDetails = async (req, res) => {
+  try {
+    const member = await MemberService.getByUser(req.user._id);
+    if (!member) return res.status(404).json({ error: "Member profile not found" });
+    const details = await MemberService.getDetails(member._id);
+    return res.json(details);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
 module.exports = {
   join,
   guestJoin,
@@ -204,5 +225,7 @@ module.exports = {
   listMembers,
   getMember,
   getDetails,
-  removeMember
+  removeMember,
+  getMyProfile,
+  getMyDetails
 };
