@@ -315,6 +315,30 @@ async function login(req, res) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
+    // 🔐 Check if Login OTP is enabled
+    if (User.isLoginOtpEnabled) {
+      const otp = generateOTP();
+      User.otp = otp;
+      User.otpExpiry = Date.now() + 10 * 60 * 1000;
+      await User.save();
+
+      await loginOTPEmailTemplate(User.email, User.firstName, otp);
+
+      // Issue a temporary token for OTP verification
+      const tempToken = jwt.sign(
+        { _id: User._id, email: User.email, type: "login-otp" },
+        process.env.JWT_SECRET,
+        { expiresIn: "10m" }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "OTP sent to your email",
+        isOtpRequired: true,
+        token: tempToken
+      });
+    }
+
     const { accessToken, refreshToken } = await User.generateToken();
     User.refreshToken = refreshToken;
     await User.save();
@@ -592,6 +616,9 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     if (phone) User.phone = phone;
     if (country) User.country = country;
     if (currency) User.currency = currency;
+    if (req.body.isLoginOtpEnabled !== undefined) {
+      User.isLoginOtpEnabled = req.body.isLoginOtpEnabled;
+    }
 
     // Handle profile picture upload
     if (req.file) {

@@ -72,6 +72,10 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    isLoginOtpEnabled: {
+      type: Boolean,
+      default: false
+    },
 
     kyc_status: {
       type: String,
