@@ -7,6 +7,7 @@ const User = require("@models/userModel/user.js");
 const AppError = require("@utils/Error/AppError.js");
 const { convertPrice } = require("@utils/currency/currencyHandler.js");
 const LogisticsProvider = require("@models/marketPlace/logisticsProviderModel.js");
+const Payment = require("@models/paymentModel/payment.model.js");
 const { deliveryAssignedEmailTemplate } = require("@utils/EmailTemplate/template.js");
 const mongoose = require("mongoose");
 
@@ -417,6 +418,63 @@ const getShopViewCount = async (shopId) => {
   return ShopView.countDocuments({ shop_id: shopId });
 };
 
+const assignAndNotifyLogistics = async (orderId) => {
+  try {
+    const order = await Order.findById(orderId);
+    if (!order) return;
+
+    // 1. Try to sync shipping details from Payment record if not already set
+    if (!order.shipping_address?.street || !order.delivery_fee) {
+      // Payment orderId can be a single ID or a comma-separated list
+      const payment = await Payment.findOne({
+        orderId: { $regex: orderId.toString() }
+      });
+
+      if (payment) {
+        if (!order.delivery_fee) {
+          order.delivery_fee = payment.charge || 0; // Use charge as delivery fee if not set
+        }
+        
+        if (!order.shipping_address?.street) {
+          order.shipping_address = {
+            street: payment.address?.[0] || payment.DeliveryAddress,
+            city: payment.city,
+            state: payment.state,
+            country: payment.country,
+            zipCode: payment.zipCode
+          };
+        }
+        await order.save();
+      }
+    }
+
+    // 2. Assign logistics provider if not set
+    let provider;
+    if (!order.logistics_id) {
+      provider = await LogisticsProvider.findOne({ status: "active" }).populate("user_id");
+      if (provider) {
+        order.logistics_id = provider._id;
+        await order.save();
+      }
+    } else {
+      provider = await LogisticsProvider.findById(order.logistics_id).populate("user_id");
+    }
+
+    // 3. Send notification email
+    if (provider && provider.user_id?.email) {
+      await deliveryAssignedEmailTemplate(
+        provider.user_id.email,
+        provider.businessName || provider.user_id.firstName,
+        order._id.toString()
+      ).catch(err => console.error("Failed to send delivery email:", err));
+      
+      console.log(`Logistics notification sent to ${provider.user_id.email} for order ${orderId}`);
+    }
+  } catch (error) {
+    console.error("Error in assignAndNotifyLogistics:", error.message);
+  }
+};
+
 module.exports = {
   createShop,
   getShops,
@@ -434,5 +492,6 @@ module.exports = {
   getProductById,
   getOrdersByShopId,
   recordShopView,
-  getShopViewCount
+  getShopViewCount,
+  assignAndNotifyLogistics
 };
