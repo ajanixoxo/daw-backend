@@ -4,6 +4,7 @@ const Order = require("@models/marketPlace/orderModel.js");
 const User = require("@models/userModel/user.js");
 const Shop = require("@models/marketPlace/shopModel.js");
 const WalletLedger = require("@models/walletLedger/ledger.js");
+const marketplaceService = require("@services/marketPlace/marketPlaceServices.js");
 
 const verifySignature = (req) => {
   const hash = crypto
@@ -47,7 +48,13 @@ exports.handleWebhook = async (req, res) => {
 
             if (payment.orderId) {
               await Order.findByIdAndUpdate(payment.orderId, {
-                payment_status: "paid"
+                payment_status: "paid",
+                status: "processing"
+              });
+
+              // 🔹 Notify logistics provider
+              await marketplaceService.assignAndNotifyLogistics(payment.orderId).catch(err => {
+                console.error("Failed to assign/notify logistics in Paystack webhook:", err.message);
               });
             }
 

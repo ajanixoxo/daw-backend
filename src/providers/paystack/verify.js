@@ -4,6 +4,7 @@ const Order = require("@models/marketPlace/orderModel.js");
 const User = require("@models/userModel/user.js");
 const Shop = require("@models/marketPlace/shopModel.js");
 const WalletLedger = require("@models/walletLedger/ledger.js");
+const marketplaceService = require("@services/marketPlace/marketPlaceServices.js");
 
 const PAYSTACK_BASE_URL = "https://api.paystack.co";
 const paystackAuthHeader = () => `Bearer ${process.env.PAYSTACK_SECRET_KEY}`;
@@ -74,6 +75,11 @@ exports.verifyPayment = async (req, res) => {
         payment_status: "paid",
         escrow_status: "held",
         status: "processing"
+      });
+
+      // 🔹 Notify logistics provider
+      await marketplaceService.assignAndNotifyLogistics(payment.orderId).catch(err => {
+        console.error("Failed to assign/notify logistics in Paystack verify:", err.message);
       });
 
       try {

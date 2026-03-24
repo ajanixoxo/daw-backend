@@ -4,6 +4,7 @@ const Order = require("@models/marketPlace/orderModel.js");
 const Shop = require("@models/marketPlace/shopModel.js");
 const WalletLedger = require("@models/walletLedger/ledger.js");
 const User = require("@models/userModel/user.js");
+const marketplaceService = require("@services/marketPlace/marketPlaceServices.js");
 
 exports.verifyPayment = async (req, res) => {
   try {
@@ -52,6 +53,11 @@ exports.verifyPayment = async (req, res) => {
     order.escrow_status = "held";
     order.status = "processing";
     await order.save();
+
+    // 🔹 Notify logistics provider
+    await marketplaceService.assignAndNotifyLogistics(order._id).catch(err => {
+      console.error("Failed to assign/notify logistics in Vigipay verify:", err.message);
+    });
     console.log("platform...")
     const platformOwner = await User.findOne({
       roles: { $in: ["admin"] },

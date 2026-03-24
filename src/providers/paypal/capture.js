@@ -6,6 +6,7 @@ const Shop = require("@models/marketPlace/shopModel.js");
 const WalletLedger = require("@models/walletLedger/ledger.js");
 const LogisticsProvider = require("@models/marketPlace/logisticsProviderModel.js");
 const { deliveryAssignedEmailTemplate } = require("@utils/EmailTemplate/template.js");
+const marketplaceService = require("@services/marketPlace/marketPlaceServices.js");
 
 
 
@@ -114,31 +115,9 @@ exports.captureOrder = async (req, res) => {
         });
 
         // 🔹 Logistics assignment and notification for each order
-        try {
-          const orderData = await Order.findById(trimmedOrderId);
-          if (orderData) {
-            let provider;
-            if (!orderData.logistics_id) {
-              provider = await LogisticsProvider.findOne({ status: "active" }).populate("user_id");
-              if (provider) {
-                orderData.logistics_id = provider._id;
-                await orderData.save();
-              }
-            } else {
-              provider = await LogisticsProvider.findById(orderData.logistics_id).populate("user_id");
-            }
-
-            if (provider && provider.user_id?.email) {
-              deliveryAssignedEmailTemplate(
-                provider.user_id.email,
-                provider.businessName || provider.user_id.firstName,
-                orderData._id.toString()
-              ).catch(err => console.error("Failed to send delivery email:", err));
-            }
-          }
-        } catch (logisticsErr) {
-          console.error("Logistics assignment/notification error:", logisticsErr.message);
-        }
+        await marketplaceService.assignAndNotifyLogistics(trimmedOrderId).catch(err => {
+          console.error("Failed to assign/notify logistics in PayPal capture:", err.message);
+        });
 
         // 🔹 Update seller pending balance for each order
         try {
