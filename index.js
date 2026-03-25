@@ -12,6 +12,7 @@ const AppError = require("@utils/Error/AppError.js");
 const cooperativeRoutes = require("./src/routes/cooperativeRoutes/cooperativeRoutes.js");
 const cooperativeDashboardRoutes = require("./src/routes/cooperativeRoutes/cooperativeDashboard.routes.js");
 const cooperativeInvitationRoutes = require("./src/routes/cooperativeRoutes/cooperativeInvitation.routes.js");
+const logisticsRoutes = require("@routes/marketPlaceRoutes/logisticsRoutes.js");
 
 const tierRoutes = require("@routes/tierRoutes/tierRoutes.js");
 const memberRoutes = require("@routes/memberRoutes/memberRoutes.js");
@@ -29,6 +30,8 @@ const { vigipayWebhook } = require("@controllers/wallet/webhook/vigipayWebhook.c
 const walletRoutes = require("@routes/wallet/wallet.routes.js");
 const logger = require("@utils/logger/logger.js");
 const dashboardRoutes = require("@routes/adminRoutes/dashboard.routes.js");
+const newsletterRoutes = require("./src/routes/newsletterRoutes.js");
+
 //webhook
 
 dotenv.config();
@@ -133,6 +136,7 @@ app.use("/api/loans", loanRoutes);
 
 app.use("/marketplace", marketPlaceRoutes);
 app.use("/marketplace", extraMarketPlaceRoutes);
+app.use("/api/marketPlace/logistics", logisticsRoutes);
 
 app.use("/api", paymentRoute);
 app.use("/api", paypalRoutes);
@@ -140,6 +144,8 @@ app.use("/api", paystackRoutes);
 app.use("/kyc", kycRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/admin", dashboardRoutes);
+app.use("/api/newsletter", newsletterRoutes);
+
 
 // Admin User Management Routes (consolidated)
 const adminInvitationRoutes = require("@routes/adminRoutes/invitation.routes.js");

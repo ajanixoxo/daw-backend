@@ -4,6 +4,7 @@ const Order = require("@models/marketPlace/orderModel.js");
 const User = require("@models/userModel/user.js");
 const Shop = require("@models/marketPlace/shopModel.js");
 const WalletLedger = require("@models/walletLedger/ledger.js");
+const marketplaceService = require("@services/marketPlace/marketPlaceServices.js");
 
 
 const verifyWebhookSignature = async (req) => {
@@ -153,6 +154,15 @@ exports.handleWebhook = async (req, res) => {
         escrow_status: "held",
         status: "processing"
       });
+
+      // 🔹 Notify logistics provider(s)
+      const orderIdList = payment.orderId.split(",");
+      for (const currentOrderId of orderIdList) {
+        const trimmedOrderId = currentOrderId.trim();
+        await marketplaceService.assignAndNotifyLogistics(trimmedOrderId).catch(err => {
+          console.error(`Failed to notify logistics for order ${trimmedOrderId} in PayPal webhook:`, err.message);
+        });
+      }
 
 
       try {

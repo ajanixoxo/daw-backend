@@ -604,7 +604,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
 const updateUserProfile = asyncHandler(async (req, res) => {
   try {
     const userId = req.user._id;
-    const { firstName, lastName, phone, country, currency } = req.body;
+    const { firstName, lastName, phone, country, currency, billingAddress } = req.body;
     
     const User = await user.findById(userId);
     if (!User) {
@@ -616,6 +616,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     if (phone) User.phone = phone;
     if (country) User.country = country;
     if (currency) User.currency = currency;
+    if (billingAddress) User.billingAddress = billingAddress;
     if (req.body.isLoginOtpEnabled !== undefined) {
       User.isLoginOtpEnabled = req.body.isLoginOtpEnabled;
     }

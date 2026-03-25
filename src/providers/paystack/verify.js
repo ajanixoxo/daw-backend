@@ -77,10 +77,14 @@ exports.verifyPayment = async (req, res) => {
         status: "processing"
       });
 
-      // 🔹 Notify logistics provider
-      await marketplaceService.assignAndNotifyLogistics(payment.orderId).catch(err => {
-        console.error("Failed to assign/notify logistics in Paystack verify:", err.message);
-      });
+      // 🔹 Notify logistics provider(s)
+      const orderIdList = payment.orderId.split(",");
+      for (const currentOrderId of orderIdList) {
+        const trimmedOrderId = currentOrderId.trim();
+        await marketplaceService.assignAndNotifyLogistics(trimmedOrderId).catch(err => {
+          console.error(`Failed to notify logistics for order ${trimmedOrderId} in Paystack verify:`, err.message);
+        });
+      }
 
       try {
         //find shop name for ledger entry

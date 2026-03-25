@@ -4,7 +4,6 @@ const Order = require("@models/marketPlace/orderModel.js");
 const User = require("@models/userModel/user.js");
 const Shop = require("@models/marketPlace/shopModel.js");
 const WalletLedger = require("@models/walletLedger/ledger.js");
-const LogisticsProvider = require("@models/marketPlace/logisticsProviderModel.js");
 const { deliveryAssignedEmailTemplate } = require("@utils/EmailTemplate/template.js");
 const marketplaceService = require("@services/marketPlace/marketPlaceServices.js");
 

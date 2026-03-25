@@ -6,7 +6,6 @@ const ShopView = require("@models/marketPlace/shopViewModel.js");
 const User = require("@models/userModel/user.js");
 const AppError = require("@utils/Error/AppError.js");
 const { convertPrice } = require("@utils/currency/currencyHandler.js");
-const LogisticsProvider = require("@models/marketPlace/logisticsProviderModel.js");
 const Payment = require("@models/paymentModel/payment.model.js");
 const { deliveryAssignedEmailTemplate } = require("@utils/EmailTemplate/template.js");
 const mongoose = require("mongoose");
@@ -281,12 +280,8 @@ const createOrder = async (buyer_id, items) => {
         await item.product.save();
       }
 
-      // Auto-assign logistics provider (best effort)
-      const provider = await LogisticsProvider.findOne({ status: "active" });
-      if (provider) {
-        order.logistics_id = provider._id;
-        await order.save();
-      }
+      // Broadcasting logistics assignment (internal service)
+      // Removed individual auto-assignment at order creation
 
       createdOrders.push(order);
       allCreatedItems.push(...createdItems);
@@ -307,11 +302,61 @@ const createOrder = async (buyer_id, items) => {
 };
 
 
-const getOrdersByBuyer = async (buyer_id) =>
-  await Order.find({ buyer_id }).populate("shop_id");
+const getOrdersByBuyer = async (buyer_id) => {
+  const orders = await Order.find({ buyer_id })
+    .populate("shop_id")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  for (const order of orders) {
+    const items = await OrderItem.find({ order_id: order._id })
+      .populate({
+        path: "product_id",
+        select: "name description price images category"
+      })
+      .lean();
+
+    order.items = items.map(item => ({
+      _id: item._id,
+      product_id: item.product_id._id,
+      product_name: item.product_id.name,
+      product_description: item.product_id.description,
+      product_image: item.product_id.images?.[0] || "",
+      product_category: item.product_id.category,
+      price_at_purchase: item.price,
+      current_price: item.product_id.price,
+      quantity: item.quantity,
+      subtotal: item.price * item.quantity
+    }));
+  }
+  return orders;
+};
 
 const getOrdersById = async (orderId) => {
-  return await Order.findById(orderId).populate("shop_id");
+  const order = await Order.findById(orderId).populate("shop_id").lean();
+  if (!order) return null;
+
+  const items = await OrderItem.find({ order_id: order._id })
+    .populate({
+      path: "product_id",
+      select: "name description price images category"
+    })
+    .lean();
+
+  order.items = items.map(item => ({
+    _id: item._id,
+    product_id: item.product_id._id,
+    product_name: item.product_id.name,
+    product_description: item.product_id.description,
+    product_image: item.product_id.images?.[0] || "",
+    product_category: item.product_id.category,
+    price_at_purchase: item.price,
+    current_price: item.product_id.price,
+    quantity: item.quantity,
+    subtotal: item.price * item.quantity
+  }));
+
+  return order;
 };
 
 // PRODUCTS
@@ -375,7 +420,7 @@ const getOrdersByShopId = async (shop_id) => {
     const items = await OrderItem.find({ order_id: order._id })
       .populate({
         path: "product_id",
-        select: "name description price image_url category"
+        select: "name description price images category"
       })
       .lean();
 
@@ -384,7 +429,7 @@ const getOrdersByShopId = async (shop_id) => {
       product_id: item.product_id._id,
       product_name: item.product_id.name,
       product_description: item.product_id.description,
-      product_image: item.product_id.image_url,
+      product_image: item.product_id.images?.[0] || "",
       product_category: item.product_id.category,
       price_at_purchase: item.price, 
       current_price: item.product_id.price, 
@@ -448,27 +493,25 @@ const assignAndNotifyLogistics = async (orderId) => {
       }
     }
 
-    // 2. Assign logistics provider if not set
-    let provider;
-    if (!order.logistics_id) {
-      provider = await LogisticsProvider.findOne({ status: "active" }).populate("user_id");
-      if (provider) {
-        order.logistics_id = provider._id;
-        await order.save();
-      }
-    } else {
-      provider = await LogisticsProvider.findById(order.logistics_id).populate("user_id");
-    }
+    // 2. Broadcast notification to all active logistics providers (Users with logistics_provider role)
+    const providers = await User.find({ roles: { $in: ["logistics_provider"] }, status: "active" });
 
-    // 3. Send notification email
-    if (provider && provider.user_id?.email) {
-      await deliveryAssignedEmailTemplate(
-        provider.user_id.email,
-        provider.businessName || provider.user_id.firstName,
-        order._id.toString()
-      ).catch(err => console.error("Failed to send delivery email:", err));
-      
-      console.log(`Logistics notification sent to ${provider.user_id.email} for order ${orderId}`);
+    if (providers.length > 0) {
+      const notificationPromises = providers.map(user => {
+        if (user.email) {
+          return deliveryAssignedEmailTemplate(
+            user.email,
+            user.firstName || "Logistics Team",
+            order._id.toString()
+          ).catch(err => console.error(`Failed to send delivery email to ${user.email}:`, err.message));
+        }
+        return Promise.resolve();
+      });
+
+      await Promise.all(notificationPromises);
+      console.log(`Logistics broadcast notification sent to ${providers.length} providers for order ${orderId}`);
+    } else {
+      console.warn(`No active logistics providers found to notify for order ${orderId}`);
     }
   } catch (error) {
     console.error("Error in assignAndNotifyLogistics:", error.message);

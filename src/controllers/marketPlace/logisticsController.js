@@ -1,28 +1,23 @@
 const Order = require("@models/marketPlace/orderModel.js");
 const OrderItem = require("@models/marketPlace/orderItemModel.js");
-const LogisticsProvider = require("@models/marketPlace/logisticsProviderModel.js");
 const Product = require("@models/marketPlace/productModel.js");
 const Shop = require("@models/marketPlace/shopModel.js");
-
-// Helper: get logistics provider id for the currently logged-in user
-const getProviderForUser = async (userId) => {
-  const provider = await LogisticsProvider.findOne({ user_id: userId });
-  if (!provider) return null;
-  return provider;
-};
 
 // GET /api/logistics/deliveries?status=all|in_transit|delivered|pending
 exports.getMyDeliveries = async (req, res) => {
   try {
-    const provider = await getProviderForUser(req.user._id);
-    if (!provider) {
-      return res.status(403).json({ success: false, message: "Not a registered logistics provider" });
+    const hasRole = req.user && req.user.roles && req.user.roles.includes("logistics_provider");
+    if (!hasRole) {
+      return res.status(403).json({ success: false, message: "Access denied. Logistics provider role required." });
     }
 
     const { status } = req.query;
-    const filter = { logistics_id: provider._id };
+    const filter = {}; // Unified internal service: all providers see all relevant orders
     if (status && status !== "all") {
       filter.status = status;
+    } else {
+      // Default: show orders that need attention (processing, in_transit) or recently delivered
+      filter.status = { $in: ["processing", "in_transit", "delivered"] };
     }
 
     const orders = await Order.find(filter)
@@ -56,9 +51,9 @@ exports.getMyDeliveries = async (req, res) => {
 // PATCH /api/logistics/deliveries/:orderId/status
 exports.updateDeliveryStatus = async (req, res) => {
   try {
-    const provider = await getProviderForUser(req.user._id);
-    if (!provider) {
-      return res.status(403).json({ success: false, message: "Not a registered logistics provider" });
+    const hasRole = req.user && req.user.roles && req.user.roles.includes("logistics_provider");
+    if (!hasRole) {
+      return res.status(403).json({ success: false, message: "Access denied. Logistics provider role required." });
     }
 
     const { orderId } = req.params;
@@ -69,7 +64,7 @@ exports.updateDeliveryStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: `Status must be one of: ${allowedStatuses.join(", ")}` });
     }
 
-    const order = await Order.findOne({ _id: orderId, logistics_id: provider._id });
+    const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found or not assigned to you" });
     }
@@ -87,13 +82,12 @@ exports.updateDeliveryStatus = async (req, res) => {
 // GET /api/logistics/earnings
 exports.getMyEarnings = async (req, res) => {
   try {
-    const provider = await getProviderForUser(req.user._id);
-    if (!provider) {
-      return res.status(403).json({ success: false, message: "Not a registered logistics provider" });
+    const hasRole = req.user && req.user.roles && req.user.roles.includes("logistics_provider");
+    if (!hasRole) {
+      return res.status(403).json({ success: false, message: "Access denied. Logistics provider role required." });
     }
 
     const deliveredOrders = await Order.find({
-      logistics_id: provider._id,
       status: "delivered",
     }).lean();
 
@@ -145,16 +139,16 @@ exports.getMyEarnings = async (req, res) => {
 // GET /api/logistics/stats
 exports.getMyStats = async (req, res) => {
   try {
-    const provider = await getProviderForUser(req.user._id);
-    if (!provider) {
-      return res.status(403).json({ success: false, message: "Not a registered logistics provider" });
+    const hasRole = req.user && req.user.roles && req.user.roles.includes("logistics_provider");
+    if (!hasRole) {
+      return res.status(403).json({ success: false, message: "Access denied. Logistics provider role required." });
     }
 
     const [total, active, pending, delivered] = await Promise.all([
-      Order.countDocuments({ logistics_id: provider._id }),
-      Order.countDocuments({ logistics_id: provider._id, status: "in_transit" }),
-      Order.countDocuments({ logistics_id: provider._id, status: "pending" }),
-      Order.countDocuments({ logistics_id: provider._id, status: "delivered" }),
+      Order.countDocuments({ status: { $in: ["processing", "in_transit", "delivered"] } }),
+      Order.countDocuments({ status: "in_transit" }),
+      Order.countDocuments({ status: "processing" }), // 'processing' is now equivalent to pending pickup
+      Order.countDocuments({ status: "delivered" }),
     ]);
 
     return res.status(200).json({
