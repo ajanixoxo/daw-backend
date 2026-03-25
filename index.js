@@ -30,6 +30,8 @@ const { vigipayWebhook } = require("@controllers/wallet/webhook/vigipayWebhook.c
 const walletRoutes = require("@routes/wallet/wallet.routes.js");
 const logger = require("@utils/logger/logger.js");
 const dashboardRoutes = require("@routes/adminRoutes/dashboard.routes.js");
+const newsletterRoutes = require("./src/routes/newsletterRoutes.js");
+
 //webhook
 
 dotenv.config();
@@ -142,6 +144,8 @@ app.use("/api", paystackRoutes);
 app.use("/kyc", kycRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/admin", dashboardRoutes);
+app.use("/api/newsletter", newsletterRoutes);
+
 
 // Admin User Management Routes (consolidated)
 const adminInvitationRoutes = require("@routes/adminRoutes/invitation.routes.js");
