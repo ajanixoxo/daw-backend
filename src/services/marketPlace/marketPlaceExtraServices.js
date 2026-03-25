@@ -104,7 +104,7 @@ const getWishlist = async (user_id) => {
   const wishlist = await Wishlist.find({ user_id })
     .populate({
       path: "product_id",
-      select: "name description price image_url quantity category shop_id",
+      select: "name description price images quantity category shop_id",
       populate: {
         path: "shop_id",
         select: "name"

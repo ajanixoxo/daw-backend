@@ -302,11 +302,61 @@ const createOrder = async (buyer_id, items) => {
 };
 
 
-const getOrdersByBuyer = async (buyer_id) =>
-  await Order.find({ buyer_id }).populate("shop_id");
+const getOrdersByBuyer = async (buyer_id) => {
+  const orders = await Order.find({ buyer_id })
+    .populate("shop_id")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  for (const order of orders) {
+    const items = await OrderItem.find({ order_id: order._id })
+      .populate({
+        path: "product_id",
+        select: "name description price images category"
+      })
+      .lean();
+
+    order.items = items.map(item => ({
+      _id: item._id,
+      product_id: item.product_id._id,
+      product_name: item.product_id.name,
+      product_description: item.product_id.description,
+      product_image: item.product_id.images?.[0] || "",
+      product_category: item.product_id.category,
+      price_at_purchase: item.price,
+      current_price: item.product_id.price,
+      quantity: item.quantity,
+      subtotal: item.price * item.quantity
+    }));
+  }
+  return orders;
+};
 
 const getOrdersById = async (orderId) => {
-  return await Order.findById(orderId).populate("shop_id");
+  const order = await Order.findById(orderId).populate("shop_id").lean();
+  if (!order) return null;
+
+  const items = await OrderItem.find({ order_id: order._id })
+    .populate({
+      path: "product_id",
+      select: "name description price images category"
+    })
+    .lean();
+
+  order.items = items.map(item => ({
+    _id: item._id,
+    product_id: item.product_id._id,
+    product_name: item.product_id.name,
+    product_description: item.product_id.description,
+    product_image: item.product_id.images?.[0] || "",
+    product_category: item.product_id.category,
+    price_at_purchase: item.price,
+    current_price: item.product_id.price,
+    quantity: item.quantity,
+    subtotal: item.price * item.quantity
+  }));
+
+  return order;
 };
 
 // PRODUCTS
@@ -370,7 +420,7 @@ const getOrdersByShopId = async (shop_id) => {
     const items = await OrderItem.find({ order_id: order._id })
       .populate({
         path: "product_id",
-        select: "name description price image_url category"
+        select: "name description price images category"
       })
       .lean();
 
@@ -379,7 +429,7 @@ const getOrdersByShopId = async (shop_id) => {
       product_id: item.product_id._id,
       product_name: item.product_id.name,
       product_description: item.product_id.description,
-      product_image: item.product_id.image_url,
+      product_image: item.product_id.images?.[0] || "",
       product_category: item.product_id.category,
       price_at_purchase: item.price, 
       current_price: item.product_id.price, 

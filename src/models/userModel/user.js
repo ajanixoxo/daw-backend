@@ -210,6 +210,16 @@ const UserSchema = new mongoose.Schema(
     currency: {
       type: String,
       trim: true
+    },
+    billingAddress: {
+      fullName: String,
+      email: String,
+      phone: String,
+      streetAddress: String,
+      city: String,
+      state: String,
+      zipCode: String,
+      country: String,
     }
 
   },

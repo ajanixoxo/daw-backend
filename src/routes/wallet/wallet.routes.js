@@ -26,7 +26,7 @@ router.put("/update-pin", protect, restrictTo("admin"), walletController.updateW
 
 router.get("/get/account", protect, restrictTo("seller"), walletController.getAccount);
 
-router.get("/ledger", protect, restrictTo("admin", "seller", "support-admin"), walletController.walletLedgerController);
+router.get("/ledger", protect, restrictTo("admin", "seller", "support-admin", "buyer", "member"), walletController.walletLedgerController);
 
 router.post("/transfer/money", protect, restrictTo("seller"), walletController.payFromStaticWallet);
 
