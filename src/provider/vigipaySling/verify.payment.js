@@ -54,10 +54,14 @@ exports.verifyPayment = async (req, res) => {
     order.status = "processing";
     await order.save();
 
-    // 🔹 Notify logistics provider
-    await marketplaceService.assignAndNotifyLogistics(order._id).catch(err => {
-      console.error("Failed to assign/notify logistics in Vigipay verify:", err.message);
-    });
+    // 🔹 Notify logistics provider(s)
+    const orderIdList = payment.orderId.split(",");
+    for (const currentOrderId of orderIdList) {
+      const trimmedOrderId = currentOrderId.trim();
+      await marketplaceService.assignAndNotifyLogistics(trimmedOrderId).catch(err => {
+        console.error(`Failed to notify logistics for order ${trimmedOrderId} in Vigipay verify:`, err.message);
+      });
+    }
     console.log("platform...")
     const platformOwner = await User.findOne({
       roles: { $in: ["admin"] },

@@ -52,10 +52,14 @@ exports.handleWebhook = async (req, res) => {
                 status: "processing"
               });
 
-              // 🔹 Notify logistics provider
-              await marketplaceService.assignAndNotifyLogistics(payment.orderId).catch(err => {
-                console.error("Failed to assign/notify logistics in Paystack webhook:", err.message);
-              });
+              // 🔹 Notify logistics provider(s)
+              const orderIdList = payment.orderId.split(",");
+              for (const currentOrderId of orderIdList) {
+                const trimmedOrderId = currentOrderId.trim();
+                await marketplaceService.assignAndNotifyLogistics(trimmedOrderId).catch(err => {
+                  console.error(`Failed to notify logistics for order ${trimmedOrderId} in Paystack webhook:`, err.message);
+                });
+              }
             }
 
             // --- Wallet Ledger ---

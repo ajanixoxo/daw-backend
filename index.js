@@ -12,6 +12,7 @@ const AppError = require("@utils/Error/AppError.js");
 const cooperativeRoutes = require("./src/routes/cooperativeRoutes/cooperativeRoutes.js");
 const cooperativeDashboardRoutes = require("./src/routes/cooperativeRoutes/cooperativeDashboard.routes.js");
 const cooperativeInvitationRoutes = require("./src/routes/cooperativeRoutes/cooperativeInvitation.routes.js");
+const logisticsRoutes = require("@routes/marketPlaceRoutes/logisticsRoutes.js");
 
 const tierRoutes = require("@routes/tierRoutes/tierRoutes.js");
 const memberRoutes = require("@routes/memberRoutes/memberRoutes.js");
@@ -133,6 +134,7 @@ app.use("/api/loans", loanRoutes);
 
 app.use("/marketplace", marketPlaceRoutes);
 app.use("/marketplace", extraMarketPlaceRoutes);
+app.use("/api/marketPlace/logistics", logisticsRoutes);
 
 app.use("/api", paymentRoute);
 app.use("/api", paypalRoutes);
