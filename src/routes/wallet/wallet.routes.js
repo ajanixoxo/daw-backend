@@ -4,30 +4,30 @@ const walletController = require("@controllers/wallet/wallet.controller.js");
 const { restrictTo, protect } = require("@middlewares/authMiddleware.js");
 
 
-router.post("/create/static/Account", protect, restrictTo("seller"), walletController.createStatic);
+router.post("/create/static/Account", protect, restrictTo("seller", "cooperative_admin"), walletController.createStatic);
 
-router.get("/create", protect, restrictTo("admin", "support-admin"), walletController.getBusinessWallet);
+router.get("/create", protect, restrictTo("admin", "support-admin", "cooperative_admin"), walletController.getBusinessWallet);
 
-router.post("/charge", protect, restrictTo("admin"), walletController.getPayoutCharge);
+router.post("/charge", protect, restrictTo("admin", "cooperative_admin"), walletController.getPayoutCharge);
 
 // Account lookup
-router.post("/account-lookup", protect, restrictTo("seller", "admin", "support-admin"), walletController.accountLookup);
+router.post("/account-lookup", protect, restrictTo("seller", "admin", "support-admin", "cooperative_admin"), walletController.accountLookup);
 
 // Banks list
-router.get("/banks", protect, restrictTo("seller", "admin", "support-admin"), walletController.getBanks);
+router.get("/banks", protect, restrictTo("seller", "admin", "support-admin", "cooperative_admin"), walletController.getBanks);
 
-router.get("/balance", protect, restrictTo("seller", "admin", "support-admin"), walletController.getMyWalletBalance);
+router.get("/balance", protect, restrictTo("seller", "admin", "support-admin", "cooperative_admin"), walletController.getMyWalletBalance);
 
 
-router.post("/payout", protect, restrictTo("admin"), walletController.processPayout);
+router.post("/payout", protect, restrictTo("admin", "cooperative_admin"), walletController.processPayout);
 
 // Update PIN
-router.put("/update-pin", protect, restrictTo("admin"), walletController.updateWalletPin);
+router.put("/update-pin", protect, restrictTo("admin", "cooperative_admin"), walletController.updateWalletPin);
 
-router.get("/get/account", protect, restrictTo("seller"), walletController.getAccount);
+router.get("/get/account", protect, restrictTo("seller", "cooperative_admin"), walletController.getAccount);
 
-router.get("/ledger", protect, restrictTo("admin", "seller", "support-admin", "buyer", "member"), walletController.walletLedgerController);
+router.get("/ledger", protect, restrictTo("admin", "seller", "support-admin", "buyer", "member", "cooperative_admin"), walletController.walletLedgerController);
 
-router.post("/transfer/money", protect, restrictTo("seller"), walletController.payFromStaticWallet);
+router.post("/transfer/money", protect, restrictTo("seller", "cooperative_admin"), walletController.payFromStaticWallet);
 
 module.exports = router;
