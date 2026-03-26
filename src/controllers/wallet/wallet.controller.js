@@ -365,8 +365,14 @@ exports.getAccount = async (req, res) => {
       });
     }
 
-    console.log("seller details", user);
-    
+    // If no wallet has been set up yet, return early without calling vigipay
+    if (!user.accountId) {
+      return res.status(200).json({
+        success: true,
+        message: "No wallet account set up",
+        response: {}
+      });
+    }
 
     const CACHE_KEY = `wallet_balance_${userId}`;
     try {
@@ -377,7 +383,7 @@ exports.getAccount = async (req, res) => {
         return res.status(200).json({
           success: true,
           message: "Response fetched successfully",
-          response: JSON.parse(cachedBalance) 
+          response: JSON.parse(cachedBalance)
         });
       }
     } catch (cacheErr) {
