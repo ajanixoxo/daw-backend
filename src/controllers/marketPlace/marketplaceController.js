@@ -1177,6 +1177,15 @@ const calculateDeliveryFee = asyncHandler(async (req, res) => {
   });
 });
 
+const orderStatus = asyncHandler(async(req, res) => {
+    const { orderId } = req.params;
+    const order_status = await marketplaceService.getOrderStatus(orderId);
+    return res.status(200).json({
+      success: true,
+      status: order_status.status
+    })
+});
+
 module.exports = {
   createShop,
   sellerOnboard,
@@ -1201,5 +1210,6 @@ module.exports = {
   trackShopView,
   getShopStats,
   updateOrderStatus,
-  calculateDeliveryFee
+  calculateDeliveryFee,
+  orderStatus
 };
