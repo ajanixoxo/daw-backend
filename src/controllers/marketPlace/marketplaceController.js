@@ -1182,7 +1182,8 @@ const orderStatus = asyncHandler(async(req, res) => {
     const order_status = await marketplaceService.getOrderStatus(orderId);
     return res.status(200).json({
       success: true,
-      status: order_status.status
+      status: order_status.status,
+      orderStatus: order_status.status_history
     })
 });
 
