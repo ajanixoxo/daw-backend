@@ -577,7 +577,8 @@ const getUserProfile = asyncHandler(async (req, res) => {
     // Proactively infer country and currency if missing
     let needsUpdate = false;
     if (!User.country && User.phone) {
-        if (User.phone.startsWith("+234") || User.phone.startsWith("234")) {
+        const phoneStr = String(User.phone);
+        if (phoneStr.startsWith("+234") || phoneStr.startsWith("234")) {
             User.country = "Nigeria";
             needsUpdate = true;
         }
@@ -591,7 +592,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
     }
 
     if (needsUpdate) {
-        await User.save();
+        try { await User.save(); } catch (_) { /* non-critical, skip if save fails */ }
     }
 
     return res.status(200).json({ success: true, user: userObject });

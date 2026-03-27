@@ -50,7 +50,7 @@ const PaymentSchema = new mongoose.Schema(
     },
     paymentType: {
       type: String,
-      enum: ["order", "contribution", "loan_repayment"],
+      enum: ["order", "contribution", "loan_repayment", "seller_subscription"],
       default: "order"
     },
     name: String,

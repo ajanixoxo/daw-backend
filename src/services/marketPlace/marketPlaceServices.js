@@ -319,13 +319,13 @@ const getOrdersByBuyer = async (buyer_id) => {
 
     order.items = items.map(item => ({
       _id: item._id,
-      product_id: item.product_id._id,
-      product_name: item.product_id.name,
-      product_description: item.product_id.description,
-      product_image: item.product_id.images?.[0] || "",
-      product_category: item.product_id.category,
+      product_id: item.product_id?._id || null,
+      product_name: item.product_id?.name || "Deleted Product",
+      product_description: item.product_id?.description || "",
+      product_image: item.product_id?.images?.[0] || "",
+      product_category: item.product_id?.category || "",
       price_at_purchase: item.price,
-      current_price: item.product_id.price,
+      current_price: item.product_id?.price || item.price,
       quantity: item.quantity,
       subtotal: item.price * item.quantity
     }));
@@ -346,13 +346,13 @@ const getOrdersById = async (orderId) => {
 
   order.items = items.map(item => ({
     _id: item._id,
-    product_id: item.product_id._id,
-    product_name: item.product_id.name,
-    product_description: item.product_id.description,
-    product_image: item.product_id.images?.[0] || "",
-    product_category: item.product_id.category,
+    product_id: item.product_id?._id || null,
+    product_name: item.product_id?.name || "Deleted Product",
+    product_description: item.product_id?.description || "",
+    product_image: item.product_id?.images?.[0] || "",
+    product_category: item.product_id?.category || "",
     price_at_purchase: item.price,
-    current_price: item.product_id.price,
+    current_price: item.product_id?.price || item.price,
     quantity: item.quantity,
     subtotal: item.price * item.quantity
   }));
