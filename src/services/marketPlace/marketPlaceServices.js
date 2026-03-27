@@ -9,6 +9,7 @@ const { convertPrice } = require("@utils/currency/currencyHandler.js");
 const Payment = require("@models/paymentModel/payment.model.js");
 const { deliveryAssignedEmailTemplate } = require("@utils/EmailTemplate/template.js");
 const mongoose = require("mongoose");
+const { error } = require("winston");
 
 // SHOP — one shop per user (business rule)
 const createShop = async (data) => {
@@ -518,6 +519,22 @@ const assignAndNotifyLogistics = async (orderId) => {
   }
 };
 
+const getOrderStatus = async(orderId) => {
+ try {
+    const orderStatus = await Order.findById(orderId);
+    // console.log("orderStatus", orderStatus);
+
+    if(!orderStatus){
+      throw new AppError("Order not available", 400);
+    }
+
+    return orderStatus;
+ } catch (error) {
+    console.log("Error in finding order", error.message);
+    throw error;
+ }
+}
+
 module.exports = {
   createShop,
   getShops,
@@ -536,5 +553,6 @@ module.exports = {
   getOrdersByShopId,
   recordShopView,
   getShopViewCount,
-  assignAndNotifyLogistics
+  assignAndNotifyLogistics,
+  getOrderStatus
 };

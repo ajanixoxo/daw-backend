@@ -39,7 +39,12 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ["pending", "processing", "in_transit", "delivered", "disputed"],
     default: "pending"
-  }
+  },
+  status_history: [{
+    status: String,
+    changed_at: { type: Date, default: Date.now },
+    note: String
+  }]
 }, { timestamps: true });
 
 const Order = mongoose.model("Order", orderSchema);
