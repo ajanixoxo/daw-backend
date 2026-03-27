@@ -54,13 +54,13 @@ const imageFileFilter = (req, file, cb) => {
 
 /**
  * Multer config for product image uploads.
- * Field: images (up to 4 files)
+ * Field: images (up to 6 files)
  */
 const productImagesUpload = multer({
   storage: memoryStorage,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: imageFileFilter
-}).array("images", 4);
+}).array("images", 6);
 
 /**
  * Multer config for shop edit (logo and banner only).

@@ -22,6 +22,14 @@ const MemberSchema = new mongoose.Schema(
 
     monthlyContribution: { type: Number, required: true },
 
+    // Queued tier change — takes effect at next contribution payment
+    pendingTierId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SubscriptionTier",
+      default: null
+    },
+    pendingTierEffectiveMonth: { type: String, default: null },
+
     joinDate: { type: Date, default: Date.now },
 
     status: {
