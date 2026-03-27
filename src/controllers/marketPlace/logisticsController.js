@@ -2,6 +2,8 @@ const Order = require("@models/marketPlace/orderModel.js");
 const OrderItem = require("@models/marketPlace/orderItemModel.js");
 const Product = require("@models/marketPlace/productModel.js");
 const Shop = require("@models/marketPlace/shopModel.js");
+const User = require("@models/userModel/user.js");
+const { orderStatusBuyerEmailTemplate, orderStatusSellerEmailTemplate } = require("@utils/EmailTemplate/template.js");
 
 // GET /api/logistics/deliveries?status=all|in_transit|delivered|pending
 exports.getMyDeliveries = async (req, res) => {
@@ -60,7 +62,56 @@ exports.updateDeliveryStatus = async (req, res) => {
     }
 
     order.status = status;
+    order.status_history.push({
+      status: status,
+      note: "Updated by Logistics Provider"
+    });
     await order.save();
+
+    // Send notifications to buyer and seller asynchronously
+    try {
+      const buyer = await User.findById(order.buyer_id);
+      
+      const shop = await Shop.findById(order.shop_id).populate("owner_id");
+      const seller = shop && shop.owner_id ? shop.owner_id : null;
+      
+      const emailPromises = [];
+      if (buyer && buyer.email) {
+        emailPromises.push(orderStatusBuyerEmailTemplate(buyer.email, buyer.firstName, order._id, status));
+      }
+      if (seller && seller.email) {
+        emailPromises.push(orderStatusSellerEmailTemplate(seller.email, seller.firstName, order._id, status));
+      }
+      
+      // Fire notifications without throwing on failure
+      Promise.allSettled(emailPromises).catch(console.error);
+    } catch (notifyError) {
+      console.error("Error sending order status notifications:", notifyError);
+    }    
+    //release scrow too
+    if (status === "delivered") {
+        const shop = await Shop.findById(order.shop_id);
+        if (!shop) {
+          throw new AppError("Shop not found for this order", 404);
+        }
+    
+        const seller = await User.findById(shop.owner_id);
+        if (!seller) {
+          throw new AppError("Seller not found", 404);
+        }
+    
+        // Move funds from pending to account_Balance (Available)
+        // seller.pending_amount should have been increased by verifyPayment
+        const amountToTransfer = order.total_amount;
+    
+        seller.pending_amount = Math.max(0, (seller.pending_amount || 0) - amountToTransfer);
+        seller.account_Balance = (seller.account_Balance || 0) + amountToTransfer;
+    
+        order.escrow_status = "released";
+    
+        await seller.save();
+        console.log(`Funds released for order ${orderId}: ${amountToTransfer} moved to seller ${seller._id} available balance.`);
+      }
 
     return res.status(200).json({ success: true, message: "Delivery status updated", data: order });
   } catch (error) {
