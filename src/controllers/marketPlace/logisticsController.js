@@ -6,11 +6,6 @@ const Shop = require("@models/marketPlace/shopModel.js");
 // GET /api/logistics/deliveries?status=all|in_transit|delivered|pending
 exports.getMyDeliveries = async (req, res) => {
   try {
-    const hasRole = req.user && req.user.roles && req.user.roles.includes("logistics_provider");
-    if (!hasRole) {
-      return res.status(403).json({ success: false, message: "Access denied. Logistics provider role required." });
-    }
-
     const { status } = req.query;
     const filter = {}; // Unified internal service: all providers see all relevant orders
     if (status && status !== "all") {
@@ -51,11 +46,6 @@ exports.getMyDeliveries = async (req, res) => {
 // PATCH /api/logistics/deliveries/:orderId/status
 exports.updateDeliveryStatus = async (req, res) => {
   try {
-    const hasRole = req.user && req.user.roles && req.user.roles.includes("logistics_provider");
-    if (!hasRole) {
-      return res.status(403).json({ success: false, message: "Access denied. Logistics provider role required." });
-    }
-
     const { orderId } = req.params;
     const { status } = req.body;
 
@@ -82,11 +72,6 @@ exports.updateDeliveryStatus = async (req, res) => {
 // GET /api/logistics/earnings
 exports.getMyEarnings = async (req, res) => {
   try {
-    const hasRole = req.user && req.user.roles && req.user.roles.includes("logistics_provider");
-    if (!hasRole) {
-      return res.status(403).json({ success: false, message: "Access denied. Logistics provider role required." });
-    }
-
     const deliveredOrders = await Order.find({
       status: "delivered",
     }).lean();
@@ -139,11 +124,6 @@ exports.getMyEarnings = async (req, res) => {
 // GET /api/logistics/stats
 exports.getMyStats = async (req, res) => {
   try {
-    const hasRole = req.user && req.user.roles && req.user.roles.includes("logistics_provider");
-    if (!hasRole) {
-      return res.status(403).json({ success: false, message: "Access denied. Logistics provider role required." });
-    }
-
     const [total, active, pending, delivered] = await Promise.all([
       Order.countDocuments({ status: { $in: ["processing", "in_transit", "delivered"] } }),
       Order.countDocuments({ status: "in_transit" }),
