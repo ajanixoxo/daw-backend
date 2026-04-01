@@ -3,8 +3,8 @@ const router = express.Router();
 const logisticsController = require("@controllers/marketPlace/logisticsController.js");
 const { protect, restrictTo } = require("@middlewares/authMiddleware.js");
 
-// All logistics routes require authentication and logistics_provider role
-router.use(protect, restrictTo("logistics_provider"));
+// All logistics routes require authentication, logistics_provider, or admin roles
+router.use(protect, restrictTo("logistics_provider", "admin", "support-admin"));
 
 router.get("/deliveries", logisticsController.getMyDeliveries);
 router.patch("/deliveries/:orderId/status", logisticsController.updateDeliveryStatus);
