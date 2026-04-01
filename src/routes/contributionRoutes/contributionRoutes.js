@@ -11,6 +11,8 @@ const {
   verifyContributionPayment,
   listMyContributions
 } = require("../../controllers/Contribution/contribution.controller.js");
+const { verifyPayment } = require("../../providers/paystack/verify.js");
+
 const {
   createContributionType,
   listContributionTypes,
