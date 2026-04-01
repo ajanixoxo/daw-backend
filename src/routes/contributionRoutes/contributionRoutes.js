@@ -65,7 +65,7 @@ router.get(
 router.get("/summary", protect, getContributionSummary);
 router.get("/history", protect, listMyContributions);
 router.post("/pay", protect, initiateContributionPayment);
-router.get("/verify/:reference", protect, verifyPayment);  //changed verifyContributionPayment -> verifyPayment
+router.get("/verify/:reference", protect, verifyContributionPayment);
 
 
 // --- Original member-scoped routes ---
