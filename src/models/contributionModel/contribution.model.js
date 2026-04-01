@@ -19,7 +19,13 @@ const ContributionSchema = new mongoose.Schema(
       ref: "ContributionType"
     },
 
-    amount: { type: Number, required: true },
+    amount: { type: Number, required: true }, // NGN value (for stats/consistency)
+    paidAmount: { type: Number },           // Actual amount paid in the specified currency
+    currency: { 
+      type: String, 
+      enum: ["NGN", "USD"], 
+      default: "NGN" 
+    },
 
     month: { type: String, required: true }, // e.g., "January 2025"
 

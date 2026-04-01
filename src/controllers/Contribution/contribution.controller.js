@@ -113,17 +113,25 @@ const listCooperativeContributions = async (req, res) => {
       .lean();
 
     // Flatten for frontend consumption
-    const formatted = contributions.map(c => ({
-      _id: c._id,
-      member: c.memberId?.userId
-        ? `${c.memberId.userId.firstName} ${c.memberId.userId.lastName}`
-        : "Unknown",
-      email: c.memberId?.userId?.email || "",
-      type: c.contributionTypeId?.name || c.month || "N/A",
-      amount: c.amount,
-      date: c.paidAt || c.createdAt,
-      status: c.status
-    }));
+    const formatted = contributions.map(c => {
+      const currency = c.currency || (c.memberId?.userId?.currency) || "NGN";
+      const ngnAmount = c.amount;
+      const usdAmount = TIER_USD_MAP[ngnAmount] || ngnAmount; // Fallback to raw amount if no map found
+      const displayAmount = currency === "USD" ? usdAmount : ngnAmount;
+
+      return {
+        _id: c._id,
+        member: c.memberId?.userId
+          ? `${c.memberId.userId.firstName} ${c.memberId.userId.lastName}`
+          : "Unknown",
+        email: c.memberId?.userId?.email || "",
+        type: c.contributionTypeId?.name || c.month || "N/A",
+        amount: displayAmount, // amount in the specific currency
+        currency: currency,
+        date: c.paidAt || c.createdAt,
+        status: c.status
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -382,9 +390,16 @@ const initiateContributionPayment = async (req, res) => {
         memberId: member._id,
         cooperativeId: member.cooperativeId,
         amount: member.monthlyContribution, // always stored in NGN
+        currency: isUSD ? "USD" : "NGN",
+        paidAmount: isUSD ? (TIER_USD_MAP[member.monthlyContribution] || member.monthlyContribution) : member.monthlyContribution,
         month,
         status: "pending"
       });
+    } else {
+      // If it exists but currency/paidAmount aren't set, update them
+      contribution.currency = isUSD ? "USD" : "NGN";
+      contribution.paidAmount = isUSD ? (TIER_USD_MAP[contribution.amount] || contribution.amount) : contribution.amount;
+      await contribution.save();
     }
 
     // For USD members use the fixed tier USD amount; NGN members pay NGN
