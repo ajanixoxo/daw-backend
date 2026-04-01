@@ -11,6 +11,8 @@ const {
   verifyContributionPayment,
   listMyContributions
 } = require("../../controllers/Contribution/contribution.controller.js");
+const { verifyPayment } = require("../../providers/paystack/verify.js");
+
 const {
   createContributionType,
   listContributionTypes,
@@ -63,7 +65,7 @@ router.get(
 router.get("/summary", protect, getContributionSummary);
 router.get("/history", protect, listMyContributions);
 router.post("/pay", protect, initiateContributionPayment);
-router.get("/verify/:reference", protect, verifyContributionPayment);
+router.get("/verify/:reference", protect, verifyPayment);  //changed verifyContributionPayment -> verifyPayment
 
 
 // --- Original member-scoped routes ---
