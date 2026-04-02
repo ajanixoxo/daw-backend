@@ -236,16 +236,18 @@ exports.getRecentMembers = async (req, res) => {
       .limit(4)
       .lean();
 
-    // Format the response
-    const formattedMembers = recentMembers.map(member => ({
-      userId: member.userId._id,
-      firstName: member.userId.firstName,
-      lastName: member.userId.lastName,
-      email: member.userId.email,
-      joinDate: member.createdAt,
-      subscriptionTier: member.subscriptionTierId?.name || "N/A",
-      status: member.status || "active"
-    }));
+    // Format the response, filtering out any members with missing user data
+    const formattedMembers = recentMembers
+      .filter((member) => member.userId)
+      .map((member) => ({
+        userId: member.userId._id,
+        firstName: member.userId.firstName,
+        lastName: member.userId.lastName,
+        email: member.userId.email,
+        joinDate: member.createdAt,
+        subscriptionTier: member.subscriptionTierId?.name || "N/A",
+        status: member.status || "active",
+      }));
 
     return res.status(200).json({
       success: true,
