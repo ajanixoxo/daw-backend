@@ -3,8 +3,13 @@ const Product = require("@models/marketPlace/productModel.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const OrderItem = require("@models/marketPlace/orderItemModel.js");
 const ShopView = require("@models/marketPlace/shopViewModel.js");
+const User = require("@models/userModel/user.js");
 const AppError = require("@utils/Error/AppError.js");
+const { convertPrice } = require("@utils/currency/currencyHandler.js");
+const Payment = require("@models/paymentModel/payment.model.js");
+const { deliveryAssignedEmailTemplate } = require("@utils/EmailTemplate/template.js");
 const mongoose = require("mongoose");
+const { error } = require("winston");
 
 // SHOP — one shop per user (business rule)
 const createShop = async (data) => {
@@ -14,7 +19,24 @@ const createShop = async (data) => {
   }
   return Shop.create(data);
 };
-const getShops = async () => await Shop.find();
+const getShops = async () => {
+  const shops = await Shop.find().lean();
+  if (shops.length === 0) return [];
+
+  const shopIds = shops.map((s) => s._id);
+  const counts = await Product.aggregate([
+    { $match: { shop_id: { $in: shopIds } } },
+    { $group: { _id: "$shop_id", count: { $sum: 1 } } },
+  ]);
+
+  const countMap = {};
+  counts.forEach((c) => { countMap[c._id.toString()] = c.count; });
+
+  return shops.map((shop) => ({
+    ...shop,
+    productCount: countMap[shop._id.toString()] || 0,
+  }));
+};
 const getShopById = async (id) => {
   return await Shop.findById(id);
 };
@@ -64,7 +86,7 @@ const editShop = async ({ shopId, ownerId, data }) => {
 
 
 // PRODUCT
-const createProduct = async ({ sellerId, shopId, name, quantity, price, category, description, images, status, variants, productFeatures, careInstruction, returnPolicy }) => {
+const createProduct = async ({ sellerId, shopId, name, quantity, weight, location, price, category, description, images, status, variants, productFeatures, careInstruction, returnPolicy }) => {
   const shop = await Shop.findOne({
     _id: shopId,
     owner_id: sellerId,
@@ -83,20 +105,18 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
     throw new AppError("Quantity cannot be negative", 400);
   }
 
-  const existingProduct = await Product.findOne({
-    shop_id: shopId,
-    name: { $regex: `^${name}$`, $options: "i" }
-  });
-
-  if (existingProduct) {
-    throw new AppError("Product already exists in this shop", 409);
-  }
+  // Fetch seller's currency preference or default by country
+  const seller = await User.findById(sellerId);
+  const sellerCurrency = seller?.country === "Nigeria" ? "NGN" : "USD";
 
   return await Product.create({
     shop_id: shopId,
     name,
-    quantity,
-    price,
+    quantity: Number(quantity),
+    weight: Number(weight),
+    location,
+    price: Number(price),
+    currency: sellerCurrency,
     category,
     description,
     images: images || [],
@@ -108,7 +128,18 @@ const createProduct = async ({ sellerId, shopId, name, quantity, price, category
   });
 };
 
-const getProductsByShop = async (shop_id) => await Product.find({ shop_id });
+const getProductsByShop = async (shop_id, reqUser) => {
+  const products = await Product.find({ shop_id }).populate("shop_id", "name").lean();
+  const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
+
+  return products.map(product => ({
+    ...product,
+    shop_name: product.shop_id?.name || "",
+    shop_id: product.shop_id?._id || product.shop_id,
+    displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
+    displayCurrency: userCurrency
+  }));
+};
 
 const editProduct = async ({ sellerId, productId, updates }) => {
   const product = await Product.findById(productId);
@@ -181,82 +212,89 @@ const deleteProduct = async ({ sellerId, productId }) => {
 // ORDER
 const createOrder = async (buyer_id, items) => {
   try {
-    let total_amount = 0;
-    const orderItems = [];
-    const updatedProducts = [];
-    let derivedShopId = null;
+    if (!items || items.length === 0) {
+      throw new AppError("No items provided", 400);
+    }
 
-    console.log("Starting order creation...");
-
-    for (let index = 0; index < items.length; index++) {
-      const item = items[index];
-
+    // 1. Group items by shop_id
+    const shopGroups = {};
+    for (const item of items) {
       if (!item.product_id || !item.quantity || item.quantity <= 0) {
         throw new AppError("Invalid item data", 400);
       }
 
       const product = await Product.findById(item.product_id);
-      if (!product) {throw new AppError("Product not found", 404);}
-
-      // 🔹 Derive shop_id from first product
-      if (index === 0) {
-        derivedShopId = product.shop_id;
-      }
-
-      // 🔹 Ensure all products belong to same shop
-      if (product.shop_id.toString() !== derivedShopId.toString()) {
-        throw new AppError("All products must belong to the same shop", 400);
+      if (!product) {
+        throw new AppError(`Product ${item.product_id} not found`, 404);
       }
 
       if (product.quantity < item.quantity) {
         throw new AppError(`Insufficient stock for ${product.name}`, 400);
       }
 
-      if (!product.price || product.price <= 0) {
-        throw new AppError(`Invalid price for ${product.name}`, 400);
+      const shopId = product.shop_id.toString();
+      if (!shopGroups[shopId]) {
+        shopGroups[shopId] = {
+          shop_id: shopId,
+          items: [],
+          total_amount: 0
+        };
       }
 
       const subtotal = product.price * item.quantity;
-      total_amount += subtotal;
+      shopGroups[shopId].total_amount += subtotal;
+      shopGroups[shopId].items.push({
+        product,
+        quantity: item.quantity,
+        price: product.price
+      });
+    }
 
-      orderItems.push({
-        product_id: product._id,
-        price: product.price,
-        quantity: item.quantity
+    const createdOrders = [];
+    const allCreatedItems = [];
+
+    // 2. Create an order for each shop group
+    for (const shopId of Object.keys(shopGroups)) {
+      const group = shopGroups[shopId];
+
+      const order = await Order.create({
+        buyer_id,
+        shop_id: group.shop_id,
+        total_amount: group.total_amount,
+        status: "pending",
+        payment_status: "unpaid",
+        escrow_status: "pending"
       });
 
-      const originalQuantity = product.quantity;
-      product.quantity -= item.quantity;
-      await product.save();
+      const orderItemsToCreate = group.items.map(item => ({
+        order_id: order._id,
+        product_id: item.product._id,
+        price: item.price,
+        quantity: item.quantity
+      }));
 
-      updatedProducts.push({ product, originalQuantity });
-    }
+      const createdItems = await OrderItem.insertMany(orderItemsToCreate);
 
-    if (total_amount <= 0) {
-      for (const { product, originalQuantity } of updatedProducts) {
-        product.quantity = originalQuantity;
-        await product.save();
+      // Decrement stock for each product
+      for (const item of group.items) {
+        item.product.quantity -= item.quantity;
+        await item.product.save();
       }
-      throw new AppError("Invalid total amount", 400);
+
+      // Broadcasting logistics assignment (internal service)
+      // Removed individual auto-assignment at order creation
+
+      createdOrders.push(order);
+      allCreatedItems.push(...createdItems);
     }
 
-    const order = await Order.create({
-      buyer_id,
-      shop_id: derivedShopId,  
-      total_amount,
-      status: "pending",
-      payment_status: "unpaid",
-      escrow_status: "pending"
-    });
-
-    const finalItems = orderItems.map(i => ({
-      ...i,
-      order_id: order._id
-    }));
-
-    const createdItems = await OrderItem.insertMany(finalItems);
-
-    return { order, orderItems: createdItems };
+    return {
+      orders: createdOrders,
+      orderItems: allCreatedItems,
+      // For backward compatibility with controllers expecting single objects
+      order: createdOrders[0],
+      orderId: createdOrders[0]._id
+    };
 
   } catch (error) {
     console.error("Error in createOrder:", error.message);
@@ -265,25 +303,108 @@ const createOrder = async (buyer_id, items) => {
 };
 
 
-const getOrdersByBuyer = async (buyer_id) =>
-  await Order.find({ buyer_id }).populate("shop_id");
+const getOrdersByBuyer = async (buyer_id) => {
+  const orders = await Order.find({ buyer_id })
+    .populate("shop_id")
+    .sort({ createdAt: -1 })
+    .lean();
+
+  for (const order of orders) {
+    const items = await OrderItem.find({ order_id: order._id })
+      .populate({
+        path: "product_id",
+        select: "name description price images category"
+      })
+      .lean();
+
+    order.items = items.map(item => ({
+      _id: item._id,
+      product_id: item.product_id?._id || null,
+      product_name: item.product_id?.name || "Deleted Product",
+      product_description: item.product_id?.description || "",
+      product_image: item.product_id?.images?.[0] || "",
+      product_category: item.product_id?.category || "",
+      price_at_purchase: item.price,
+      current_price: item.product_id?.price || item.price,
+      quantity: item.quantity,
+      subtotal: item.price * item.quantity
+    }));
+  }
+  return orders;
+};
 
 const getOrdersById = async (orderId) => {
-  return await Order.findById(orderId).populate("shop_id");
+  const order = await Order.findById(orderId).populate("shop_id").lean();
+  if (!order) return null;
+
+  const items = await OrderItem.find({ order_id: order._id })
+    .populate({
+      path: "product_id",
+      select: "name description price images category"
+    })
+    .lean();
+
+  order.items = items.map(item => ({
+    _id: item._id,
+    product_id: item.product_id?._id || null,
+    product_name: item.product_id?.name || "Deleted Product",
+    product_description: item.product_id?.description || "",
+    product_image: item.product_id?.images?.[0] || "",
+    product_category: item.product_id?.category || "",
+    price_at_purchase: item.price,
+    current_price: item.product_id?.price || item.price,
+    quantity: item.quantity,
+    subtotal: item.price * item.quantity
+  }));
+
+  return order;
 };
 
 // PRODUCTS
-async function getAllProduct() {
+async function getAllProduct(reqUser) {
   try {
-    return await Product.find();
+    const products = await Product.find()
+      .populate({
+        path: "shop_id",
+        select: "name owner_id logo_url",
+        populate: {
+          path: "owner_id",
+          select: "firstName lastName email"
+        }
+      })
+      .lean();
+
+    const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
+
+    return products.map(product => ({
+      ...product,
+      shop_name: product.shop_id?.name || "",
+      shop_logo: product.shop_id?.logo_url || "",
+      seller_name: product.shop_id?.owner_id ? `${product.shop_id.owner_id.firstName} ${product.shop_id.owner_id.lastName}` : "Unknown",
+      seller_email: product.shop_id?.owner_id?.email || "",
+      shop_id: product.shop_id?._id || product.shop_id,
+      displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
+      displayCurrency: userCurrency
+    }));
   } catch (error) {
     return error;
   }
 }
 
-const getProductById = async (productId) => {
+const getProductById = async (productId, reqUser) => {
   try {
-    return await Product.findById(productId);
+    const product = await Product.findById(productId).populate("shop_id", "name").lean();
+    if (!product) return null;
+
+    const userCurrency = reqUser?.country === "Nigeria" ? "NGN" : "USD";
+
+    return {
+      ...product,
+      shop_name: product.shop_id?.name || "",
+      shop_id: product.shop_id?._id || product.shop_id,
+      displayPrice: convertPrice(product.price, product.currency || "NGN", userCurrency),
+      displayCurrency: userCurrency
+    };
   } catch (error) {
     return error;
   }
@@ -300,7 +421,7 @@ const getOrdersByShopId = async (shop_id) => {
     const items = await OrderItem.find({ order_id: order._id })
       .populate({
         path: "product_id",
-        select: "name description price image_url category"
+        select: "name description price images category"
       })
       .lean();
 
@@ -309,7 +430,7 @@ const getOrdersByShopId = async (shop_id) => {
       product_id: item.product_id._id,
       product_name: item.product_id.name,
       product_description: item.product_id.description,
-      product_image: item.product_id.image_url,
+      product_image: item.product_id.images?.[0] || "",
       product_category: item.product_id.category,
       price_at_purchase: item.price, 
       current_price: item.product_id.price, 
@@ -343,6 +464,77 @@ const getShopViewCount = async (shopId) => {
   return ShopView.countDocuments({ shop_id: shopId });
 };
 
+const assignAndNotifyLogistics = async (orderId) => {
+  try {
+    const order = await Order.findById(orderId);
+    if (!order) return;
+
+    // 1. Try to sync shipping details from Payment record if not already set
+    if (!order.shipping_address?.street || !order.delivery_fee) {
+      // Payment orderId can be a single ID or a comma-separated list
+      const payment = await Payment.findOne({
+        orderId: { $regex: orderId.toString() }
+      });
+
+      if (payment) {
+        if (!order.delivery_fee) {
+          order.delivery_fee = payment.charge || 0; // Use charge as delivery fee if not set
+        }
+        
+        if (!order.shipping_address?.street) {
+          order.shipping_address = {
+            street: payment.address?.[0] || payment.DeliveryAddress,
+            city: payment.city,
+            state: payment.state,
+            country: payment.country,
+            zipCode: payment.zipCode
+          };
+        }
+        await order.save();
+      }
+    }
+
+    // 2. Broadcast notification to all active logistics providers (Users with logistics_provider role)
+    const providers = await User.find({ roles: { $in: ["logistics_provider"] }, status: "active" });
+
+    if (providers.length > 0) {
+      const notificationPromises = providers.map(user => {
+        if (user.email) {
+          return deliveryAssignedEmailTemplate(
+            user.email,
+            user.firstName || "Logistics Team",
+            order._id.toString()
+          ).catch(err => console.error(`Failed to send delivery email to ${user.email}:`, err.message));
+        }
+        return Promise.resolve();
+      });
+
+      await Promise.all(notificationPromises);
+      console.log(`Logistics broadcast notification sent to ${providers.length} providers for order ${orderId}`);
+    } else {
+      console.warn(`No active logistics providers found to notify for order ${orderId}`);
+    }
+  } catch (error) {
+    console.error("Error in assignAndNotifyLogistics:", error.message);
+  }
+};
+
+const getOrderStatus = async(orderId) => {
+ try {
+    const orderStatus = await Order.findById(orderId);
+    // console.log("orderStatus", orderStatus);
+
+    if(!orderStatus){
+      throw new AppError("Order not available", 400);
+    }
+
+    return orderStatus;
+ } catch (error) {
+    console.log("Error in finding order", error.message);
+    throw error;
+ }
+}
+
 module.exports = {
   createShop,
   getShops,
@@ -360,5 +552,7 @@ module.exports = {
   getProductById,
   getOrdersByShopId,
   recordShopView,
-  getShopViewCount
+  getShopViewCount,
+  assignAndNotifyLogistics,
+  getOrderStatus
 };

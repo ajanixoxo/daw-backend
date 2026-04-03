@@ -12,6 +12,7 @@ const AppError = require("@utils/Error/AppError.js");
 const cooperativeRoutes = require("./src/routes/cooperativeRoutes/cooperativeRoutes.js");
 const cooperativeDashboardRoutes = require("./src/routes/cooperativeRoutes/cooperativeDashboard.routes.js");
 const cooperativeInvitationRoutes = require("./src/routes/cooperativeRoutes/cooperativeInvitation.routes.js");
+const logisticsRoutes = require("@routes/marketPlaceRoutes/logisticsRoutes.js");
 
 const tierRoutes = require("@routes/tierRoutes/tierRoutes.js");
 const memberRoutes = require("@routes/memberRoutes/memberRoutes.js");
@@ -19,6 +20,8 @@ const contributionRoutes = require("@routes/contributionRoutes/contributionRoute
 const loanRoutes = require("@routes/loanRoutes/loanRoutes.js");
 const userRoutes = require("@routes/userRoutes/userRoutes.js");
 const paymentRoute = require("@routes/paymentRoute/payment.route.js");
+const paypalRoutes = require("@routes/paymentRoute/paypal.routes.js");
+const paystackRoutes = require("@routes/paymentRoute/paystack.routes.js");
 const kycRoutes = require("@routes/kycRoutes/kyc.js");
 const { startCronJobs } = require("@jobs/monthlyContribution.cron.js");
 const globalErrorHandler = require("./src/middlewares/errorMiddleware");
@@ -27,6 +30,8 @@ const { vigipayWebhook } = require("@controllers/wallet/webhook/vigipayWebhook.c
 const walletRoutes = require("@routes/wallet/wallet.routes.js");
 const logger = require("@utils/logger/logger.js");
 const dashboardRoutes = require("@routes/adminRoutes/dashboard.routes.js");
+const newsletterRoutes = require("./src/routes/newsletterRoutes.js");
+
 //webhook
 
 dotenv.config();
@@ -57,6 +62,36 @@ app.post(
     return next();
   },
   vigipayWebhook
+);
+
+app.post(
+  "/api/v1/webhook/paypal",
+  express.raw({ type: "application/json" }),
+  (req, res, next) => {
+    req.rawBody = req.body;
+    try {
+      req.body = JSON.parse(req.body.toString());
+    } catch (err) {
+      return res.status(400).json({ message: "Invalid JSON payload" });
+    }
+    return next();
+  },
+  require("./src/providers/paypal/webhook.js").handleWebhook
+);
+
+app.post(
+  "/api/v1/webhook/paystack",
+  express.raw({ type: "application/json" }),
+  (req, res, next) => {
+    req.rawBody = req.body;
+    try {
+      req.body = JSON.parse(req.body.toString());
+    } catch (err) {
+      return res.status(400).json({ message: "Invalid JSON payload" });
+    }
+    return next();
+  },
+  require("./src/providers/paystack/webhook.js").handleWebhook
 );
 
 const PORT = process.env.PORT || 3000;
@@ -101,11 +136,16 @@ app.use("/api/loans", loanRoutes);
 
 app.use("/marketplace", marketPlaceRoutes);
 app.use("/marketplace", extraMarketPlaceRoutes);
+app.use("/api/marketPlace/logistics", logisticsRoutes);
 
 app.use("/api", paymentRoute);
+app.use("/api", paypalRoutes);
+app.use("/api", paystackRoutes);
 app.use("/kyc", kycRoutes);
 app.use("/api/wallet", walletRoutes);
 app.use("/api/admin", dashboardRoutes);
+app.use("/api/newsletter", newsletterRoutes);
+
 
 // Admin User Management Routes (consolidated)
 const adminInvitationRoutes = require("@routes/adminRoutes/invitation.routes.js");

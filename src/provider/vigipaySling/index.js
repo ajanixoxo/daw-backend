@@ -3,6 +3,7 @@ const Payment = require("@models/paymentModel/payment.model.js");
 const User = require("@models/userModel/user.js");
 const Order = require("@models/marketPlace/orderModel.js");
 const AppError = require("@utils/Error/AppError.js");
+const Shop = require("@models/marketPlace/shopModel.js");
 
 exports.createPayment = async (req, res) => {
   try {
@@ -14,7 +15,7 @@ exports.createPayment = async (req, res) => {
     }
 
     const {
-      // amount,
+      // amount: providedAmount,
       orderId,
       description,
       name,
@@ -42,8 +43,22 @@ exports.createPayment = async (req, res) => {
     if (!order) {
       throw new AppError("Invalid or already paid order", 400);
     }
-
+    const shop = await Shop.findById(order.shop_id);
+    if (!shop) {
+      throw new AppError("Shop not found for this order", 404);
+    }
     const amount = order.total_amount;
+
+    // let amount = order.total_amount;
+    
+    // If frontend provides an amount (subtotal/total calculated with extras), use it and sync order
+    // if (providedAmount && providedAmount > 0) {
+    //   amount = providedAmount;
+    //   if (order.total_amount !== providedAmount) {
+    //     order.total_amount = providedAmount;
+    //     await order.save();
+    //   }
+    // }
 
     const payload = {
       customerReference: order._id.toString(),
@@ -73,9 +88,11 @@ exports.createPayment = async (req, res) => {
       userId: user._id,
 
       amount,
-      orderId: order._id,
+      orderId: order._id.toString(),
       description: payload.description,
-
+      shopId: order.shop_id,
+      shopOwnerId: shop.owner_id,
+      shopName: shop.name || "N/A",
       transactionReference: data.transactionReference,
       redirectUrl: data.redirectUrl,
       channel: data.channel || "vigipay",

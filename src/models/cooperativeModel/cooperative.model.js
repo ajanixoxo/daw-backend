@@ -26,7 +26,7 @@ const CooperativeSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected", "suspended"],
+      enum: ["pending", "approved", "rejected", "suspended", "active"],
       default: "pending"
     },
 

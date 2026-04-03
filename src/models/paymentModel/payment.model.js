@@ -17,7 +17,16 @@ const PaymentSchema = new mongoose.Schema(
       enum: ["pending", "successful", "failed"],
       default: "pending"
     },
-
+    paypalStatus: {
+      type: String,
+      enum: ["pending", "successful", "failed"],
+      default: "pending"
+    },
+    paystackStatus: {
+      type: String,
+      enum: ["pending", "successful", "failed"],
+      default: "pending"
+    },
     amountAfterCharge: Number,
     charge: Number,
 
@@ -25,6 +34,24 @@ const PaymentSchema = new mongoose.Schema(
     orderId: {
       type: String
       // ref: "Order",
+    },
+    shopId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Shop"
+    },
+    shopOwnerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+    shopName: String,
+    contributionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Contribution"
+    },
+    paymentType: {
+      type: String,
+      enum: ["order", "contribution", "loan_repayment", "seller_subscription"],
+      default: "order"
     },
     name: String,
     email: String,

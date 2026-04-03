@@ -40,6 +40,7 @@ router.get("/get/all/products", marketplaceController.getAllProduct);
 router.get("/get/products/:productId", marketplaceController.getProduct);
 
 // Orders
+router.post("/calculate-shipping", protectOptional, marketplaceController.calculateDeliveryFee);
 router.post("/place/orders", protect, restrictTo("member", "buyer"), marketplaceController.createOrder);
 router.get("/get/orders", protect, restrictTo("member", "buyer"), marketplaceController.getOrdersByBuyer);
 router.get("/get/orders/:orderId", protect, restrictTo("member", "buyer"), marketplaceController.getoRdersById);
@@ -49,6 +50,8 @@ router.get(
   restrictTo("seller"),
   marketplaceController.getOrdersByShop
 );
+
+router.get("/order/status/:orderId", protect, restrictTo("buyer", "seller"),  marketplaceController.orderStatus);
 router.patch("/orders/:orderId/status", protect, restrictTo("admin", "seller"), marketplaceController.updateOrderStatus);
 router.get("/get/seller/details", protect, restrictTo("admin"), marketplaceController.getSellerDetails);
 

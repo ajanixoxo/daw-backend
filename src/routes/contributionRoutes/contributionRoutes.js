@@ -5,7 +5,11 @@ const {
   markPaid,
   getContributionStats,
   listCooperativeContributions,
-  getLoanEligibility
+  getLoanEligibility,
+  getContributionSummary,
+  initiateContributionPayment,
+  verifyContributionPayment,
+  listMyContributions
 } = require("../../controllers/Contribution/contribution.controller.js");
 const {
   createContributionType,
@@ -55,6 +59,12 @@ router.get(
   restrictTo("admin", "cooperative_admin", "cooperative", "member", "seller", "buyer"),
   getLoanEligibility
 );
+
+router.get("/summary", protect, getContributionSummary);
+router.get("/history", protect, listMyContributions);
+router.post("/pay", protect, initiateContributionPayment);
+router.get("/verify/:reference", protect, verifyContributionPayment);
+
 
 // --- Original member-scoped routes ---
 router.post("/", protect, createContribution);

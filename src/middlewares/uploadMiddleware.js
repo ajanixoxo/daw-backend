@@ -23,7 +23,7 @@ const fileFilter = (req, file, cb) => {
 
 /**
  * Multer config for seller onboarding (multipart form).
- * Fields: shopLogo, shopBanner, idDocument, proofOfResidence, businessCac, passportPhotograph
+ * Fields: shopLogo, shopBanner, businessCac, passportPhotograph
  * All optional for multer; controller validates required documents.
  */
 const sellerOnboardUpload = multer({
@@ -33,8 +33,6 @@ const sellerOnboardUpload = multer({
 }).fields([
   { name: "shopLogo", maxCount: 1 },
   { name: "shopBanner", maxCount: 1 },
-  { name: "idDocument", maxCount: 1 },
-  { name: "proofOfResidence", maxCount: 1 },
   { name: "businessCac", maxCount: 1 },
   { name: "passportPhotograph", maxCount: 1 }
 ]);
@@ -56,13 +54,13 @@ const imageFileFilter = (req, file, cb) => {
 
 /**
  * Multer config for product image uploads.
- * Field: images (up to 4 files)
+ * Field: images (up to 6 files)
  */
 const productImagesUpload = multer({
   storage: memoryStorage,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: imageFileFilter
-}).array("images", 4);
+}).array("images", 6);
 
 /**
  * Multer config for shop edit (logo and banner only).

@@ -27,7 +27,7 @@ const registerUser = asyncHandler(async (req, res) => {
       phone, 
       roles
     } = req.body;
-
+    console.log(req.body);
     // Normalize roles
     let normalizedRoles = roles;
     
@@ -91,7 +91,7 @@ const registerUser = asyncHandler(async (req, res) => {
         message: "User already exists"
       });
     }
-
+    console.log('existing user', existingUser);
     const otp = generateOTP();
     const otpExpiry = Date.now() + 10 * 60 * 1000;
 
@@ -104,7 +104,9 @@ const registerUser = asyncHandler(async (req, res) => {
       phone,
       roles: finalRoles,
       otp,
-      otpExpiry
+      otpExpiry,
+      country: req.body.country,
+      currency: req.body.currency
     });
 
     await verificationEmailTemplate(newUser.email, newUser.firstName, otp);
@@ -194,11 +196,25 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
     User.isVerified = true;
     User.otp = null;
     User.otpExpiry = null;
+
+    // Issue a proper full token (with roles) so the user can act immediately
+    // without having to log out and log back in.
+    const { accessToken, refreshToken } = await User.generateToken();
+    User.refreshToken = refreshToken;
     await User.save();
 
     return res.status(200).json({
       success: true,
-      message: "Email verified successfully"
+      message: "Email verified successfully",
+      token: {
+        accessToken,
+        refreshToken,
+      },
+      user: {
+        _id: User._id,
+        email: User.email,
+        roles: User.roles,
+      },
     });
   } catch (error) {
     return next(error);
@@ -299,31 +315,48 @@ async function login(req, res) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    if (!User.isVerified) {
-      return res.status(400).json({ message: "Please verify your email" });
+    // 🔐 Check if Login OTP is enabled
+    if (User.isLoginOtpEnabled) {
+      const otp = generateOTP();
+      User.otp = otp;
+      User.otpExpiry = Date.now() + 10 * 60 * 1000;
+      await User.save();
+
+      await loginOTPEmailTemplate(User.email, User.firstName, otp);
+
+      // Issue a temporary token for OTP verification
+      const tempToken = jwt.sign(
+        { _id: User._id, email: User.email, type: "login-otp" },
+        process.env.JWT_SECRET,
+        { expiresIn: "10m" }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "OTP sent to your email",
+        isOtpRequired: true,
+        token: tempToken
+      });
     }
 
-    const otp = generateOTP();
-    User.otp = otp;
-    User.otpExpiry = Date.now() + 10 * 60 * 1000;
+    const { accessToken, refreshToken } = await User.generateToken();
+    User.refreshToken = refreshToken;
     await User.save();
 
-    await loginOTPEmailTemplate(email, User.firstName, otp);
-
-    const TempToken = jwt.sign(
-      { _id: User._id, email: User.email },
-      JWT_SECRET,
-      { expiresIn: "15min" }
-    );
-
     User.password = undefined;
-    User.otp = undefined;
-    User.otpExpiry = undefined;
+
+    // Check if user has any shops
+    const shopCount = await Shop.countDocuments({ owner_id: User._id });
+    const userObject = User.toObject();
+    userObject.hasShop = shopCount > 0;
 
     return res.status(200).json({
-      message: "OTP sent to email. Please verify OTP to complete login.",
-      user: User,
-      token: TempToken
+      message: "Login successful",
+      token: {
+        accessToken,
+        refreshToken
+      },
+      user: userObject
     });
   } catch (error) {
     console.error("Error in login:", error);
@@ -367,7 +400,7 @@ async function loginOTP(req, res) {
     const shopCount = await Shop.countDocuments({ owner_id: userId });
     const userObject = User.toObject();
     userObject.hasShop = shopCount > 0;
-
+    
     return res.json({
       message: "Login successful",
       token: {
@@ -419,7 +452,8 @@ async function forgotPassword(req, res) {
     const tempToken = jwt.sign(
       {
         _id: User._id,
-        email: User.email
+        email: User.email,
+        type: "password-reset"
       },
       JWT_SECRET,
       { expiresIn: "15min" }
@@ -437,7 +471,12 @@ async function forgotPassword(req, res) {
 
 async function resetPassword(req, res) {
   try {
-    const userId = req.user._id;
+    const { _id, type } = req.user;
+    
+    if (type !== "password-reset") {
+      return res.status(401).json({ message: "Invalid token type for password reset" });
+    }
+
     const { otp, newPassword, confirmNewPassword } = req.body;
     if (!otp || !newPassword || !confirmNewPassword) {
       return res.status(400).json({ message: "All fields are required" });
@@ -446,7 +485,7 @@ async function resetPassword(req, res) {
       return res.status(400).json({ message: "Passwords must match" });
     }
     const User = await user
-      .findById(userId)
+      .findById(_id)
       .select("+otp +otpExpiry +password");
     if (!User) {
       return res.status(404).json({ message: "User not found" });
@@ -535,6 +574,27 @@ const getUserProfile = asyncHandler(async (req, res) => {
       userObject.shop = [];
     }
 
+    // Proactively infer country and currency if missing
+    let needsUpdate = false;
+    if (!User.country && User.phone) {
+        const phoneStr = String(User.phone);
+        if (phoneStr.startsWith("+234") || phoneStr.startsWith("234")) {
+            User.country = "Nigeria";
+            needsUpdate = true;
+        }
+    }
+    if (!User.currency && User.country === "Nigeria") {
+        User.currency = "NGN";
+        needsUpdate = true;
+    } else if (!User.currency && User.country) {
+        User.currency = "USD";
+        needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+        try { await User.save(); } catch (_) { /* non-critical, skip if save fails */ }
+    }
+
     return res.status(200).json({ success: true, user: userObject });
   } catch (error) {
     console.error("Error in getUserProfile:", error);
@@ -545,7 +605,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
 const updateUserProfile = asyncHandler(async (req, res) => {
   try {
     const userId = req.user._id;
-    const { firstName, lastName, phone } = req.body;
+    const { firstName, lastName, phone, country, currency, billingAddress } = req.body;
     
     const User = await user.findById(userId);
     if (!User) {
@@ -555,6 +615,12 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     if (firstName) User.firstName = firstName;
     if (lastName) User.lastName = lastName;
     if (phone) User.phone = phone;
+    if (country) User.country = country;
+    if (currency) User.currency = currency;
+    if (billingAddress) User.billingAddress = billingAddress;
+    if (req.body.isLoginOtpEnabled !== undefined) {
+      User.isLoginOtpEnabled = req.body.isLoginOtpEnabled;
+    }
 
     // Handle profile picture upload
     if (req.file) {
@@ -579,6 +645,8 @@ const updateUserProfile = asyncHandler(async (req, res) => {
         email: User.email,
         phone: User.phone,
         profilePicture: User.profilePicture,
+        country: User.country,
+        currency: User.currency,
         roles: User.roles,
       },
     });

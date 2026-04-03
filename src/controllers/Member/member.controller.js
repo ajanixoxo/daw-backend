@@ -42,9 +42,8 @@ const join = async (req, res) => {
     // Return updated user so the frontend can sync roles in localStorage
     const updatedUser = await require("../../models/userModel/user.js")
       .findById(userId)
-      .select("firstName lastName email phone roles isVerified status shop member avatar")
+      .select("firstName lastName email phone roles isVerified status shop avatar")
       .populate("shop", "_id name")
-      .populate("member", "_id cooperativeId")
       .lean();
 
     return res.status(201).json({ message: "Joined", member, user: updatedUser });
@@ -114,6 +113,8 @@ const guestJoin = async (req, res) => {
       firstName,
       lastName,
       phone,
+      country,
+      currency,
       cooperativeId,
       subscriptionTierId
     } = req.body || {};
@@ -153,6 +154,8 @@ const guestJoin = async (req, res) => {
       email: email.toLowerCase().trim(),
       password,
       phone: (phone || "").trim(),
+      country: (country || "").trim(),
+      currency: (currency || "USD").trim(),
       roles: ["buyer"],
       isVerified: false,
       otp,
@@ -194,6 +197,98 @@ const guestJoin = async (req, res) => {
   }
 };
 
+const getMyProfile = async (req, res) => {
+  try {
+    const member = await MemberService.getByUser(req.user._id);
+    if (!member) return res.status(404).json({ error: "Member profile not found" });
+    return res.json(member);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+const getMyDetails = async (req, res) => {
+  try {
+    const member = await MemberService.getByUser(req.user._id);
+    if (!member) return res.status(404).json({ error: "Member profile not found" });
+    const details = await MemberService.getDetails(member._id);
+    return res.json(details);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+const requestTierChange = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { tierId } = req.body;
+
+    if (!tierId || !mongoose.Types.ObjectId.isValid(tierId)) {
+      return res.status(400).json({ error: "Invalid tierId" });
+    }
+
+    const member = await MemberService.getByUser(userId);
+    if (!member) return res.status(404).json({ error: "Member profile not found" });
+
+    const SubscriptionTier = require("../../models/subscriptionTierModel/subscriptionTier.model.js");
+    const tier = await SubscriptionTier.findOne({
+      _id: tierId,
+      cooperativeId: member.cooperativeId,
+      isActive: true
+    });
+    if (!tier) return res.status(404).json({ error: "Tier not found or not available" });
+
+    const currentTierId = member.subscriptionTierId?._id
+      ? member.subscriptionTierId._id.toString()
+      : member.subscriptionTierId?.toString();
+    if (currentTierId === tierId && !member.pendingTierId) {
+      return res.status(400).json({ error: "You are already on this tier" });
+    }
+
+    // Effective from next calendar month
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const effectiveMonth = next.toLocaleString("en-US", { month: "long", year: "numeric" });
+
+    const Member = require("../../models/memberModel/member.model.js");
+    await Member.findByIdAndUpdate(member._id, {
+      pendingTierId: tierId,
+      pendingTierEffectiveMonth: effectiveMonth
+    });
+
+    return res.json({
+      success: true,
+      message: `Tier change to ${tier.name} scheduled for ${effectiveMonth}`,
+      pendingTier: { _id: tier._id, name: tier.name, monthlyContribution: tier.monthlyContribution },
+      effectiveMonth
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
+const cancelTierChange = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const member = await MemberService.getByUser(userId);
+    if (!member) return res.status(404).json({ error: "Member profile not found" });
+
+    if (!member.pendingTierId) {
+      return res.status(400).json({ error: "No pending tier change to cancel" });
+    }
+
+    const Member = require("../../models/memberModel/member.model.js");
+    await Member.findByIdAndUpdate(member._id, {
+      pendingTierId: null,
+      pendingTierEffectiveMonth: null
+    });
+
+    return res.json({ success: true, message: "Pending tier change cancelled" });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
+
 module.exports = {
   join,
   guestJoin,
@@ -201,5 +296,9 @@ module.exports = {
   listMembers,
   getMember,
   getDetails,
-  removeMember
+  removeMember,
+  getMyProfile,
+  getMyDetails,
+  requestTierChange,
+  cancelTierChange
 };

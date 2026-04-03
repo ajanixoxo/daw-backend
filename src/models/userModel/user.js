@@ -72,6 +72,10 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    isLoginOtpEnabled: {
+      type: Boolean,
+      default: false
+    },
 
     kyc_status: {
       type: String,
@@ -109,7 +113,8 @@ const UserSchema = new mongoose.Schema(
         "cooperative",
         "member",
         "logistics_provider",
-        "cooperative_admin"
+        "cooperative_admin",
+        "support-admin"
       ],
       required: true
     },
@@ -197,6 +202,24 @@ const UserSchema = new mongoose.Schema(
     pending_amount: {
       type: Number,
       default: 0
+    },
+    country: {
+      type: String,
+      trim: true
+    },
+    currency: {
+      type: String,
+      trim: true
+    },
+    billingAddress: {
+      fullName: String,
+      email: String,
+      phone: String,
+      streetAddress: String,
+      city: String,
+      state: String,
+      zipCode: String,
+      country: String,
     }
 
   },

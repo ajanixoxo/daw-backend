@@ -19,6 +19,8 @@ const productSchema = new mongoose.Schema({
   category: String,
   quantity: { type: Number, required: true },
   price: { type: Number, required: true },
+  weight: { type: Number, required: true },
+  location: { type: String, required: true, default: "Lagos, Nigeria" },
   images: [String],
   variants: [variantSchema],
   productFeatures: { type: String, default: "" },
@@ -28,7 +30,13 @@ const productSchema = new mongoose.Schema({
     type: String,
     enum: ["available", "unavailable", "draft", "out_of_stock"],
     default: "available"
+  },
+  currency: {
+    type: String,
+    enum: ["NGN", "USD"],
+    default: "NGN"
   }
+
 }, { timestamps: true });
 
 const Product = mongoose.model("Product", productSchema);

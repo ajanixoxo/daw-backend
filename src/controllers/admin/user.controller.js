@@ -10,8 +10,7 @@ const getUserById = asyncHandler(async (req, res) => {
 
   const user = await User.findById(id)
     .select("-password -refreshToken -invitationToken")
-    .populate("shop", "name")
-    .populate("cooperative", "name");
+    .populate("shop", "name");
 
   if (!user) {
     res.status(404);

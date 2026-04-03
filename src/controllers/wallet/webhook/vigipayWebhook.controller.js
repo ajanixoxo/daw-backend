@@ -1,6 +1,7 @@
 const WalletLedger = require("@models/walletLedger/ledger.js");
 const User = require("@models/userModel/user");
 const verifyVigipaySignature = require("@utils/vigipayClient/verifyWebhook.js");
+const redisClient = require("../../../utils/redisClient.js");
 
 exports.vigipayWebhook = async (req, res) => {
   try {
@@ -55,6 +56,14 @@ exports.vigipayWebhook = async (req, res) => {
 
       await ledger.save();
 
+      if (finalStatus === "SUCCESS") {
+        try {
+          await redisClient.del(`wallet_balance_ADMIN_${ledger.userId}`);
+        } catch (cacheErr) {
+          console.error("Redis del error:", cacheErr);
+        }
+      }
+
       return res.status(200).json({ message: "Ledger updated successfully" });
     }
 
@@ -77,6 +86,14 @@ exports.vigipayWebhook = async (req, res) => {
       transactionDate: new Date(TransactionDate),
       rawWebhookPayload: req.body
     });
+
+    if (finalStatus === "SUCCESS") {
+      try {
+        await redisClient.del(`wallet_balance_ADMIN_${user._id}`);
+      } catch (cacheErr) {
+        console.error("Redis del error:", cacheErr);
+      }
+    }
 
     return res.status(200).json({
       message: "Ledger created from webhook"

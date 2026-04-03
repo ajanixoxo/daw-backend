@@ -13,10 +13,10 @@ const router = express.Router();
 // Public: get the single DAW cooperative and its tiers (no auth)
 router.get("/daw", getDAWCooperative);
 
-router.post("/", protect, restrictTo("admin", "cooperative", "member"), createCooperative);//make it admin specific
-router.put("/", protect, restrictTo("admin", "cooperative", "member"), updateCooperative);
-router.get("/", protect, restrictTo("admin", "seller","buyer","cooperative","member"), listCooperatives);
-router.get("/:id", protect, restrictTo("admin", "seller","buyer","cooperative","member"), getCooperative);
+router.post("/", protect, restrictTo("admin", "support-admin", "support_admin", "cooperative", "member"), createCooperative);//make it admin specific
+router.put("/", protect, restrictTo("admin", "support-admin", "support_admin", "cooperative", "member"), updateCooperative);
+router.get("/", protect, restrictTo("admin", "support-admin", "support_admin", "seller","buyer","cooperative","member"), listCooperatives);
+router.get("/:id", protect, restrictTo("admin", "support-admin", "support_admin", "seller","buyer","cooperative","member"), getCooperative);
 
 
 module.exports = router;

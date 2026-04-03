@@ -22,7 +22,11 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "seed:shops": "node src/scripts/seedDemoShops.js",
+    "cleanup": "node src/scripts/cleanupOrphanedData.js",
+    "seed:logistics": "node scripts/seed-logistics.js",
+    "seed:product": "node scripts/seed-product-weight-location.js"
   },
   "author": "",
   "license": "ISC",
@@ -45,6 +49,7 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.10",
     "nodemon": "^3.1.10",
+    "redis": "^5.11.0",
     "streamifier": "^0.1.1",
     "uuid": "^13.0.0",
     "winston": "^3.19.0"
