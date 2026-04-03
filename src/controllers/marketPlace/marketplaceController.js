@@ -1,6 +1,7 @@
 const asyncHandler = require("express-async-handler");
 const mongoose = require("mongoose");
 const marketplaceService = require("@services/marketPlace/marketPlaceServices.js");
+const marketplaceExtraServices = require("@services/marketPlace/marketPlaceExtraServices.js");
 const MemberService = require("@services/member.service.js");
 const AppError = require("@utils/Error/AppError.js");
 const User = require("@models/userModel/user.js");
@@ -819,6 +820,14 @@ const createOrder = asyncHandler(async (req, res) => {
   
   const { order, orders, orderItems } =
     await marketplaceService.createOrder(buyer_id, items);
+
+  // Clear cart after successful order creation
+  try {
+    await marketplaceExtraServices.clearCart(buyer_id);
+  } catch (error) {
+    console.error("Failed to clear cart after order creation:", error.message);
+    // Non-blocking: we still return the order success
+  }
 
   res.status(201).json({
     success: true,
