@@ -149,12 +149,15 @@ const editProduct = async ({ sellerId, productId, updates }) => {
 
   const shop = await Shop.findOne({
     _id: product.shop_id,
-    owner_id: sellerId,
-    status: "active"
+    owner_id: sellerId
   });
 
   if (!shop) {
-    throw new AppError("Unauthorized or inactive shop", 403);
+    throw new AppError("Unauthorized: You do not own the shop for this product", 403);
+  }
+
+  if (shop.status === "suspended") {
+    throw new AppError("Shop is suspended and cannot edit products", 403);
   }
 
   const allowedFields = [
