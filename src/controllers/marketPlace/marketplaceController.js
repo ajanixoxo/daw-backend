@@ -1047,30 +1047,38 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   const oldStatus = order.status;
   order.status = status;
 
-  // Business logic: When order is delivered, release funds to seller's available balance
-  if (status === "delivered" && oldStatus !== "delivered") {
-    const shop = await Shop.findById(order.shop_id);
-    if (!shop) {
-      throw new AppError("Shop not found for this order", 404);
+    // Business logic: When order is delivered, release funds to seller's available balance
+    if (status === "delivered" && oldStatus !== "delivered") {
+      const shop = await Shop.findById(order.shop_id);
+      if (!shop) {
+        throw new AppError("Shop not found for this order", 404);
+      }
+
+      const seller = await User.findById(shop.owner_id);
+      if (seller) {
+        // Move items total from pending to account_Balance (Available) for SELLER
+        const fee = order.delivery_fee || 0;
+        const sellerAmount = order.total_amount - fee;
+        
+        seller.pending_amount = Math.max(0, (seller.pending_amount || 0) - sellerAmount);
+        seller.account_Balance = (seller.account_Balance || 0) + sellerAmount;
+        await seller.save();
+        console.log(`Funds released for seller ${seller._id}: ${sellerAmount} moved to available balance.`);
+        
+        // --- LOGISTICS PROVIDER PAYOUT ---
+        if (order.logistics_id) {
+          const provider = await User.findById(order.logistics_id);
+          if (provider) {
+            provider.pending_amount = Math.max(0, (provider.pending_amount || 0) - fee);
+            provider.account_Balance = (provider.account_Balance || 0) + fee;
+            await provider.save();
+            console.log(`Delivery fee released for provider ${provider._id}: ${fee} moved to available balance.`);
+          }
+        }
+      }
+
+      order.escrow_status = "released";
     }
-
-    const seller = await User.findById(shop.owner_id);
-    if (!seller) {
-      throw new AppError("Seller not found", 404);
-    }
-
-    // Move funds from pending to account_Balance (Available)
-    // seller.pending_amount should have been increased by verifyPayment
-    const amountToTransfer = order.total_amount;
-
-    seller.pending_amount = Math.max(0, (seller.pending_amount || 0) - amountToTransfer);
-    seller.account_Balance = (seller.account_Balance || 0) + amountToTransfer;
-
-    order.escrow_status = "released";
-
-    await seller.save();
-    console.log(`Funds released for order ${orderId}: ${amountToTransfer} moved to seller ${seller._id} available balance.`);
-  }
 
   await order.save();
 
