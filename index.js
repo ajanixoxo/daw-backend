@@ -143,6 +143,7 @@ app.use("/api", paypalRoutes);
 app.use("/api", paystackRoutes);
 app.use("/kyc", kycRoutes);
 app.use("/api/wallet", walletRoutes);
+app.use("/api/withdrawals", require("@routes/wallet/withdrawalRoutes.js"));
 app.use("/api/admin", dashboardRoutes);
 app.use("/api/newsletter", newsletterRoutes);
 
