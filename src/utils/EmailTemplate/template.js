@@ -48,20 +48,95 @@ const forgotPasswordOTPEmailTemplate = asyncHandler(async(email, firstName, otp)
   await sendEmail(email, subject, html);
   console.log("forgot password OTP email sent to:", email);
 });
-const deliveryAssignedEmailTemplate = asyncHandler(async(email, name, orderId) => {
+const deliveryAssignedEmailTemplate = asyncHandler(async (email, name, orderId, items) => {
   const subject = "New Delivery Order Assigned - Digital African Women";
+  const itemsHtml = items.map(item => `
+    <tr>
+      <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.product_id?.name || 'Product'}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
+    </tr>
+  `).join('');
+
   const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2 style="color: #333;">New Delivery Assigned</h2>
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+      <h2 style="color: #F10E7C; text-align: center;">New Delivery Assigned</h2>
       <p>Dear ${name},</p>
-      <p>A new order has been placed and assigned to you for delivery. The Shipment ID is:</p>
-      <h3 style="background-color: #f4f4f4; padding: 10px; border-radius: 5px; display: inline-block;">${orderId}</h3>
-      <p>Please log in to your logistics dashboard to view the delivery details and update its status.</p>
-      <p>Best regards,<br/>The Digital African Women Team</p>
+      <p>A new order has been placed and assigned for delivery. Please find the product order details below:</p>
+      
+      <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+        <p style="margin: 0;"><strong>Shipment ID:</strong> ${orderId}</p>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <thead>
+          <tr style="background-color: #f4f4f4;">
+            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Product</th>
+            <th style="padding: 10px; text-align: center; border-bottom: 2px solid #ddd;">Qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+      </table>
+
+      <p>Please log in to your logistics dashboard to view the full routing details and update the status.</p>
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="https://digitalafricanwomen.com/logistics/deliveries" style="background-color: #F10E7C; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Dashboard</a>
+      </div>
+      <p style="margin-top: 30px; border-top: 1px solid #eee; pt: 20px; font-size: 12px; color: #777;">
+        Best regards,<br/>The Digital African Women Team
+      </p>
     </div>
   `;
   await sendEmail(email, subject, html);
   console.log("New delivery email sent to:", email);
+});
+
+const orderReceivedSellerEmailTemplate = asyncHandler(async (email, name, orderId, buyerName, items) => {
+  const subject = "New Order Received! - Digital African Women";
+  const itemsHtml = items.map(item => `
+    <tr>
+      <td style="padding: 10px; border-bottom: 1px solid #eee;">${item.product_id?.name || 'Product'}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+      <h2 style="color: #2ba570; text-align: center;">You have a new order!</h2>
+      <p>Dear ${name},</p>
+      <p>Congratulations! An order has been placed for items in your shop by <strong>${buyerName}</strong>.</p>
+      
+      <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+        <p style="margin: 0;"><strong>Order ID:</strong> ${orderId}</p>
+      </div>
+
+      <h4 style="margin-bottom: 10px;">Items Ordered:</h4>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <thead>
+          <tr style="background-color: #f4f4f4;">
+            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Product</th>
+            <th style="padding: 10px; text-align: center; border-bottom: 2px solid #ddd;">Qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+      </table>
+
+      <p>Please prepare these items for pickup. A logistics provider has been notified and will be in contact shortly.</p>
+      
+      <div style="text-align: center; margin-top: 30px;">
+        <a href="https://digitalafricanwomen.com/seller/orders" style="background-color: #2ba570; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Manage Order</a>
+      </div>
+      
+      <p style="margin-top: 30px; border-top: 1px solid #eee; pt: 20px; font-size: 12px; color: #777;">
+        Best regards,<br/>The Digital African Women Team
+      </p>
+    </div>
+  `;
+  await sendEmail(email, subject, html);
+  console.log("New order (seller) email sent to:", email);
 });
 
 const orderStatusBuyerEmailTemplate = asyncHandler(async(email, name, orderId, newStatus) => {
@@ -101,6 +176,7 @@ module.exports ={
   loginOTPEmailTemplate,
   forgotPasswordOTPEmailTemplate,
   deliveryAssignedEmailTemplate,
+  orderReceivedSellerEmailTemplate,
   orderStatusBuyerEmailTemplate,
   orderStatusSellerEmailTemplate
 };

@@ -7,7 +7,7 @@ const User = require("@models/userModel/user.js");
 const AppError = require("@utils/Error/AppError.js");
 const { convertPrice } = require("@utils/currency/currencyHandler.js");
 const Payment = require("@models/paymentModel/payment.model.js");
-const { deliveryAssignedEmailTemplate } = require("@utils/EmailTemplate/template.js");
+const { deliveryAssignedEmailTemplate, orderReceivedSellerEmailTemplate } = require("@utils/EmailTemplate/template.js");
 const mongoose = require("mongoose");
 const { error } = require("winston");
 
@@ -469,8 +469,19 @@ const getShopViewCount = async (shopId) => {
 
 const assignAndNotifyLogistics = async (orderId) => {
   try {
-    const order = await Order.findById(orderId);
+    const order = await Order.findById(orderId)
+      .populate("buyer_id", "firstName lastName email phone")
+      .populate({
+        path: "shop_id",
+        populate: { path: "owner_id", select: "firstName lastName email phone" }
+      });
+      
     if (!order) return;
+
+    // Fetch order items to include in emails
+    const items = await OrderItem.find({ order_id: order._id })
+      .populate({ path: "product_id", select: "name" })
+      .lean();
 
     // 1. Try to sync shipping details from Payment record if not already set
     if (!order.shipping_address?.street || !order.delivery_fee) {
@@ -497,6 +508,17 @@ const assignAndNotifyLogistics = async (orderId) => {
       }
     }
 
+    // 1.5. Notify the Seller that their product has been ordered
+    if (order.shop_id?.owner_id?.email) {
+      await orderReceivedSellerEmailTemplate(
+        order.shop_id.owner_id.email,
+        order.shop_id.owner_id.firstName || "Seller",
+        order._id.toString(),
+        `${order.buyer_id?.firstName || 'A customer'} ${order.buyer_id?.lastName || ''}`,
+        items
+      ).catch(err => console.error(`Failed to send seller order notification to ${order.shop_id.owner_id.email}:`, err.message));
+    }
+
     // 2. Broadcast notification to all active logistics providers (Users with logistics_provider role)
     const providers = await User.find({ roles: { $in: ["logistics_provider"] }, status: "active" });
 
@@ -506,7 +528,8 @@ const assignAndNotifyLogistics = async (orderId) => {
           return deliveryAssignedEmailTemplate(
             user.email,
             user.firstName || "Logistics Team",
-            order._id.toString()
+            order._id.toString(),
+            items // Now passing items for the "product order alone" view
           ).catch(err => console.error(`Failed to send delivery email to ${user.email}:`, err.message));
         }
         return Promise.resolve();
