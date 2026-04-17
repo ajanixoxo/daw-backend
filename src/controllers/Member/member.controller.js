@@ -39,14 +39,29 @@ const join = async (req, res) => {
       subscriptionTierId
     });
 
-    // Return updated user so the frontend can sync roles in localStorage
-    const updatedUser = await require("../../models/userModel/user.js")
+    // Fetch updated user to check new roles
+    const UserFound = await User.findById(userId);
+    if (!UserFound) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Issue fresh tokens reflecting NEW permissions
+    const { accessToken, refreshToken } = await UserFound.generateToken();
+    UserFound.refreshToken = refreshToken;
+    await UserFound.save();
+
+    const updatedUser = await User
       .findById(userId)
       .select("firstName lastName email phone roles isVerified status shop avatar")
       .populate("shop", "_id name")
       .lean();
 
-    return res.status(201).json({ message: "Joined", member, user: updatedUser });
+    return res.status(201).json({ 
+      message: "Joined", 
+      member, 
+      token: { accessToken, refreshToken },
+      user: updatedUser 
+    });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -178,18 +193,26 @@ const guestJoin = async (req, res) => {
       subscriptionTierId
     });
 
+    // Fetch updated user to get accurate roles (might have changed in joinCooperative)
+    const UserFound = await User.findById(newUser._id);
+    
+    // Issue proper tokens (using UserFound to ensure we have any post-creation role updates)
+    const { accessToken, refreshToken } = await UserFound.generateToken();
+    UserFound.refreshToken = refreshToken;
+    await UserFound.save();
+
     return res.status(201).json({
       message: "Account created and joined cooperative. OTP sent to email for verification.",
       member,
-      token: tempToken,
+      token: { accessToken, refreshToken },
       user: {
-        _id: newUser._id,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        email: newUser.email,
-        phone: newUser.phone,
-        verified: newUser.isVerified,
-        roles: newUser.roles
+        _id: UserFound._id,
+        firstName: UserFound.firstName,
+        lastName: UserFound.lastName,
+        email: UserFound.email,
+        phone: UserFound.phone,
+        verified: UserFound.isVerified,
+        roles: UserFound.roles
       }
     });
   } catch (err) {

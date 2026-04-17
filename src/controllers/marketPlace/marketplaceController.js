@@ -179,6 +179,11 @@ const sellerOnboard = asyncHandler(async (req, res) => {
     status: "pending"
   });
 
+  // Issue a fresh token with the new 'seller' role so the frontend can sync immediately
+  const { accessToken, refreshToken } = await foundUser.generateToken();
+  foundUser.refreshToken = refreshToken;
+  await foundUser.save();
+
   return res.status(201).json({
     success: true,
     shop,
@@ -189,8 +194,12 @@ const sellerOnboard = asyncHandler(async (req, res) => {
       passport_photograph_url: sellerDoc.passport_photograph_url,
       business_cac_url: sellerDoc.business_cac_url
     },
+    token: { accessToken, refreshToken },
     user: {
       _id: foundUser._id,
+      firstName: foundUser.firstName,
+      lastName: foundUser.lastName,
+      email: foundUser.email,
       roles: foundUser.roles,
       shop: foundUser.shop
     }
@@ -390,6 +399,11 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
 
   const isGuest = !req.user || !req.user._id;
 
+  // Issue fresh tokens (essential for existing users who just became sellers)
+  const { accessToken, refreshToken } = await foundUser.generateToken();
+  foundUser.refreshToken = refreshToken;
+  await foundUser.save();
+
   // Fetch the updated user so frontend can sync roles
   const updatedUser = await User.findById(userId)
     .select("firstName lastName email phone roles isVerified status shop avatar")
@@ -404,7 +418,7 @@ const cooperativeJoinWithSellerOnboard = asyncHandler(async (req, res) => {
     member,
     shop: { _id: shop._id, name: shop.name, status: shop.status },
     sellerDocuments: { _id: sellerDoc._id, status: sellerDoc.status },
-    ...(isGuest ? { token: guestTempToken } : {}),
+    token: { accessToken, refreshToken },
     user: updatedUser,
   });
 });
@@ -548,7 +562,13 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
   });
 
   const isGuest = !req.user || !req.user._id;
-  // Build user object with the UPDATED roles (after seller role was added)
+
+  // Issue fresh tokens
+  const { accessToken, refreshToken } = await foundUser.generateToken();
+  foundUser.refreshToken = refreshToken;
+  await foundUser.save();
+
+  // Build user object with the UPDATED roles
   const updatedUser = {
     _id: foundUser._id,
     firstName: foundUser.firstName,
@@ -565,7 +585,8 @@ const guestSellerOnboard = asyncHandler(async (req, res) => {
       : "Seller onboarded successfully.",
     shop: { _id: shop._id, name: shop.name, status: shop.status },
     sellerDocuments: { _id: sellerDoc._id, status: sellerDoc.status },
-    ...(isGuest ? { token: guestTempToken, user: updatedUser } : { user: updatedUser })
+    token: { accessToken, refreshToken },
+    user: updatedUser
   });
 });
 
