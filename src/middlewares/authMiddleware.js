@@ -1,12 +1,20 @@
 const jwt = require("jsonwebtoken");
+const User = require("@models/userModel/user.js");
 
-const protect = (req, res, next) => {
+const protect = async (req, res, next) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) {return res.status(401).json({ message: "Not authorized" });}
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    
+    // Fetch fresh user data from the database to ensure roles are always up-to-date
+    const freshUser = await User.findById(decoded._id).select("_id firstName lastName email roles phone").lean();
+    if (!freshUser) {
+      return res.status(401).json({ message: "User no longer exists" });
+    }
+
+    req.user = { ...decoded, roles: freshUser.roles };
     return next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {
