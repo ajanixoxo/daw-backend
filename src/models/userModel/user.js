@@ -220,6 +220,10 @@ const UserSchema = new mongoose.Schema(
       state: String,
       zipCode: String,
       country: String,
+    },
+    isPrimaryAdmin: {
+      type: Boolean,
+      default: false
     }
 
   },
