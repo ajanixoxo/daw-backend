@@ -169,8 +169,8 @@ exports.processPayout = async (req, res) => {
     }
 
     const user = await User.findById(userId);
-    if (!user || !user.walletId) {
-      return res.status(404).json({ message: "Wallet not found" });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
     // If roles is array (recommended)
@@ -178,6 +178,19 @@ exports.processPayout = async (req, res) => {
       return res.status(403).json({
         message: "You are not eligible"
       });
+    }
+
+    // --- SHARED ADMIN WALLET LOGIC ---
+    let sourceUser = user;
+    if (user.roles && (user.roles.includes("admin") || user.roles.includes("support-admin"))) {
+      const primaryAdmin = await User.findOne({ isPrimaryAdmin: true });
+      if (primaryAdmin) {
+        sourceUser = primaryAdmin;
+      }
+    }
+
+    if (!sourceUser.walletId) {
+      return res.status(404).json({ message: "Platform wallet not found" });
     }
 
     //Generate merchant reference (YOUR reference)
@@ -206,8 +219,8 @@ exports.processPayout = async (req, res) => {
 
     // Create ledger FIRST (idempotent via unique reference later)
     ledger = await walletLedger.create({
-      userId: user._id,
-      walletId: user.walletId,
+      userId: user._id, // Record who initiated the payout
+      walletId: sourceUser.walletId, // But draw from the shared wallet
       reference: merchantRef,
       merchantRef,
       type: "DEBIT",
@@ -222,7 +235,7 @@ exports.processPayout = async (req, res) => {
     const payoutRes = await vigipayClient.post(
       "/api/Wallet/transfer/account",
       {
-        senderWalletId: user.walletId,
+        senderWalletId: sourceUser.walletId, // Shared wallet
         pin,
         amount,
         bankCode,
@@ -594,11 +607,21 @@ exports.payFromStaticWallet = async (req, res) => {
 exports.getMyWalletBalance = async (req, res) => {
   try {
     const userId = req.user._id;
-    const user = await User.findById(userId).select("account_Balance pending_amount");
+    let user = await User.findById(userId).select("account_Balance pending_amount roles");
 
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
+
+    // --- SHARED ADMIN WALLET LOGIC ---
+    // If user is an admin, show them the Primary Admin's (Platform) balance
+    if (user.roles && (user.roles.includes("admin") || user.roles.includes("support-admin"))) {
+      const primaryAdmin = await User.findOne({ isPrimaryAdmin: true }).select("account_Balance pending_amount");
+      if (primaryAdmin) {
+        user = primaryAdmin; // Switch to primary admin data for the response
+      }
+    }
+    // ---------------------------------
 
     const available = user.account_Balance || 0;
     const pending = user.pending_amount || 0;
