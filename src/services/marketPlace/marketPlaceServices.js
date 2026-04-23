@@ -525,11 +525,20 @@ const assignAndNotifyLogistics = async (orderId) => {
     if (providers.length > 0) {
       const notificationPromises = providers.map(user => {
         if (user.email) {
+          const shopName = order.shop_id?.name || "N/A";
+          const sellerName = order.shop_id?.owner_id ? `${order.shop_id.owner_id.firstName} ${order.shop_id.owner_id.lastName}` : "N/A";
+          const sellerPhone = order.shop_id?.contact_number || order.shop_id?.owner_id?.phone || "N/A";
+          const pickupAddress = order.shop_id?.business_address || "N/A";
+
           return deliveryAssignedEmailTemplate(
             user.email,
             user.firstName || "Logistics Team",
             order._id.toString(),
-            items // Now passing items for the "product order alone" view
+            items,
+            shopName,
+            sellerName,
+            sellerPhone,
+            pickupAddress
           ).catch(err => console.error(`Failed to send delivery email to ${user.email}:`, err.message));
         }
         return Promise.resolve();

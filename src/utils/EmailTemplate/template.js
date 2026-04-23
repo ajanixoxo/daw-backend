@@ -48,7 +48,7 @@ const forgotPasswordOTPEmailTemplate = asyncHandler(async(email, firstName, otp)
   await sendEmail(email, subject, html);
   console.log("forgot password OTP email sent to:", email);
 });
-const deliveryAssignedEmailTemplate = asyncHandler(async (email, name, orderId, items) => {
+const deliveryAssignedEmailTemplate = asyncHandler(async (email, name, orderId, items, shopName, sellerName, sellerPhone, pickupAddress) => {
   const subject = "New Delivery Order Assigned - Digital African Women";
   const itemsHtml = items.map(item => `
     <tr>
@@ -61,12 +61,16 @@ const deliveryAssignedEmailTemplate = asyncHandler(async (email, name, orderId, 
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
       <h2 style="color: #F10E7C; text-align: center;">New Delivery Assigned</h2>
       <p>Dear ${name},</p>
-      <p>A new order has been placed and assigned for delivery. Please find the product order details below:</p>
+      <p>A new order has been placed and assigned for delivery. Please find the pickup and product details below:</p>
       
       <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
         <p style="margin: 0;"><strong>Shipment ID:</strong> ${orderId}</p>
+        <p style="margin: 5px 0 0 0;"><strong>Shop Name:</strong> ${shopName || 'N/A'}</p>
+        <p style="margin: 5px 0 0 0;"><strong>Seller:</strong> ${sellerName || 'N/A'} (${sellerPhone || 'N/A'})</p>
+        <p style="margin: 5px 0 0 0;"><strong>Pickup Address:</strong> ${pickupAddress || 'N/A'}</p>
       </div>
 
+      <h4 style="margin-bottom: 10px;">Items to Pickup:</h4>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <thead>
           <tr style="background-color: #f4f4f4;">
