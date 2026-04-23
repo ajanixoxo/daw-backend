@@ -118,35 +118,24 @@ exports.verifyPayment = async (req, res) => {
         console.error("Wallet ledger error:", ledgerErr.message);
       }
 
+      // --- Primary Admin (Treasury) Pending Amount ---
       try {
-
         const order = await Order.findById(payment.orderId);
+        const primaryAdmin = await User.findOne({ isPrimaryAdmin: true });
+        if (primaryAdmin && order) {
+          const deliveryFee = order.delivery_fee || 0;
+          const totalProductAmount = payment.amount - deliveryFee;
 
-        if (order?.shop_id) {
-
-          const shop = await Shop.findById(order.shop_id);
-
-          if (shop?.owner_id) {
-
-            const seller = await User.findById(shop.owner_id);
-
-            if (seller) {
-
-              seller.pending_amount =
-                (seller.pending_amount || 0) + payment.amount;
-
-              await seller.save();
-
-              console.log(
-                `Seller ${seller._id} pending updated`
-              );
-            }
-          }
+          primaryAdmin.pending_amount = (primaryAdmin.pending_amount || 0) + totalProductAmount;
+          await primaryAdmin.save();
+          console.log(`Paystack verify – Primary Admin treasury updated with Product Price: ${totalProductAmount} (Delivery fee of ${deliveryFee} excluded)`);
+        } else {
+          console.warn("Paystack verify – Primary Admin or Order not found to hold treasury funds.");
         }
-
-      } catch (sellerErr) {
-        console.error("Seller pending update error:", sellerErr.message);
+      } catch (adminErr) {
+        console.error("Paystack verify – Primary Admin treasury error:", adminErr.message);
       }
+      // -----------------------------
 
 
       return res.status(200).json({

@@ -62,44 +62,48 @@ exports.verifyPayment = async (req, res) => {
         console.error(`Failed to notify logistics for order ${trimmedOrderId} in Vigipay verify:`, err.message);
       });
     }
-    console.log("platform...")
-    const platformOwner = await User.findOne({
-      roles: { $in: ["admin"] },
-      walletId: { $exists: true, $ne: null }
-    });
-    console.log("Platform owner found:", !!platformOwner, platformOwner ? platformOwner._id : "No platform owner");
-
-    if (!platformOwner) {
-      console.warn("No platform owner wallet configured. Skipping ledger entry for platform.");
+    console.log("Crediting platform treasury...")
+    const primaryAdmin = await User.findOne({ isPrimaryAdmin: true });
+    
+    if (!primaryAdmin || !primaryAdmin.walletId) {
+      console.warn("Primary Admin wallet not configured. Skipping ledger entry for platform.");
     } else {
       await WalletLedger.create({
-        userId: platformOwner._id,
-        walletId: platformOwner.walletId || "N/A",
+        userId: primaryAdmin._id,
+        walletId: primaryAdmin.walletId || "N/A",
         reference: payment.transactionReference,
         merchantRef: order._id.toString(),
         type: "CREDIT",
         amount: payment.amountAfterCharge,
         status: "SUCCESS",
         channel: "vigipay",
-        beneficiaryAccount: platformOwner.walletId,
+        beneficiaryAccount: primaryAdmin.walletId,
         rawWebhookPayload: data,
         shopId: payment.shopId,
         shop_ownerId: payment.shopOwnerId,
         shopName: payment.shopName,
         transactionDate: new Date()
       });
+      console.log(`Platform treasury (Primary Admin ${primaryAdmin._id}) credited via Vigipay.`);
     }
 
-    const shop = await Shop.findById(order.shop_id);
-    if (!shop) {throw new Error("Shop not found");}
+    // --- Primary Admin (Treasury) Pending Amount ---
+    try {
+      const primaryAdmin = await User.findOne({ isPrimaryAdmin: true });
+      if (primaryAdmin) {
+        const deliveryFee = order.delivery_fee || 0;
+        const totalProductAmount = order.total_amount - deliveryFee;
 
-    const seller = await User.findById(shop.owner_id);
-    if (!seller) {throw new Error("Seller not found");}
-
-    seller.pending_amount =
-          (seller.pending_amount || 0) + order.total_amount;
-
-    await seller.save();
+        primaryAdmin.pending_amount = (primaryAdmin.pending_amount || 0) + totalProductAmount;
+        await primaryAdmin.save();
+        console.log(`Vigipay verify – Primary Admin treasury updated with Product Price: ${totalProductAmount} (Delivery fee of ${deliveryFee} excluded)`);
+      } else {
+        console.warn("Vigipay verify – No Primary Admin found to hold treasury funds.");
+      }
+    } catch (adminErr) {
+      console.error("Vigipay verify – Primary Admin treasury error:", adminErr.message);
+    }
+    // -----------------------------
 
     return res.json({
       success: true,

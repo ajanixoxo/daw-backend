@@ -118,22 +118,21 @@ exports.captureOrder = async (req, res) => {
           console.error("Failed to assign/notify logistics in PayPal capture:", err.message);
         });
 
-        // 🔹 Update seller pending balance for each order
+        // 🔹 Update Primary Admin Treasury pending balance for each order (Product Price Only)
         try {
-          const order = await Order.findById(trimmedOrderId);
-          if (order?.shop_id) {
-            const shop = await Shop.findById(order.shop_id);
-            if (shop?.owner_id) {
-              const seller = await User.findById(shop.owner_id);
-              if (seller) {
-                seller.pending_amount = (seller.pending_amount || 0) + order.total_amount;
-                await seller.save();
-                console.log(`Seller ${seller._id} pending updated for order ${order._id}`);
-              }
-            }
+          const primaryAdmin = await User.findOne({ isPrimaryAdmin: true });
+          if (primaryAdmin) {
+            const deliveryFee = order.delivery_fee || 0;
+            const totalProductAmount = order.total_amount - deliveryFee;
+
+            primaryAdmin.pending_amount = (primaryAdmin.pending_amount || 0) + totalProductAmount;
+            await primaryAdmin.save();
+            console.log(`PayPal capture – Primary Admin treasury updated for order ${order._id} with Product Price: ${totalProductAmount}`);
+          } else {
+            console.warn("PayPal capture – No Primary Admin found to hold treasury funds.");
           }
-        } catch (sellerErr) {
-          console.error("Seller update error:", sellerErr.message);
+        } catch (adminErr) {
+          console.error("PayPal capture – Primary Admin treasury error:", adminErr.message);
         }
       }
       

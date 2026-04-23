@@ -92,22 +92,22 @@ exports.handleWebhook = async (req, res) => {
             }
             // ---------------------
 
-            // --- Seller Pending Amount ---
+            // --- Primary Admin (Treasury) Pending Amount ---
             try {
               const order = await Order.findById(payment.orderId);
-              if (order?.shop_id) {
-                const shop = await Shop.findById(order.shop_id);
-                if (shop?.owner_id) {
-                  const seller = await User.findById(shop.owner_id);
-                  if (seller) {
-                    seller.pending_amount = (seller.pending_amount || 0) + payment.amount;
-                    await seller.save();
-                    console.log(`Paystack webhook – seller ${seller._id} pending_amount updated: ${seller.pending_amount}`);
-                  }
-                }
+              const primaryAdmin = await User.findOne({ isPrimaryAdmin: true });
+              if (primaryAdmin && order) {
+                const deliveryFee = order.delivery_fee || 0;
+                const totalProductAmount = payment.amount - deliveryFee;
+                
+                primaryAdmin.pending_amount = (primaryAdmin.pending_amount || 0) + totalProductAmount;
+                await primaryAdmin.save();
+                console.log(`Paystack webhook – Primary Admin treasury updated with Product Price: ${totalProductAmount} (Delivery fee of ${deliveryFee} excluded)`);
+              } else {
+                console.warn("Paystack webhook – Primary Admin or Order not found to hold treasury funds.");
               }
-            } catch (sellerErr) {
-              console.error("Paystack webhook – seller pending_amount error:", sellerErr.message);
+            } catch (adminErr) {
+              console.error("Paystack webhook – Primary Admin treasury error:", adminErr.message);
             }
             // -----------------------------
 
