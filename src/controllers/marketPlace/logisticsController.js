@@ -85,22 +85,11 @@ exports.updateDeliveryStatus = async (req, res) => {
       note: "Updated by Logistics Provider"
     });
 
-    // --- LOGISTICS PROVIDER ASSIGNMENT & FINANCIAL LOGIC ---
+    // --- LOGISTICS PROVIDER ASSIGNMENT ---
     if (status === "in_transit") {
       // Assign the provider if not already assigned
       if (!order.logistics_id) {
         order.logistics_id = req.user._id;
-      }
-      
-      // If we just assigned them (or they were already assigned but hadn't been credited pending yet)
-      // Note: We only credit pending if moving FROM pending/processing TO in_transit
-      if (originalStatus === "pending" || originalStatus === "processing") {
-        const provider = await User.findById(req.user._id);
-        if (provider) {
-          provider.pending_amount = (provider.pending_amount || 0) + (order.delivery_fee || 0);
-          await provider.save();
-          console.log(`Credited delivery fee ${order.delivery_fee} to provider ${req.user._id} pending amount.`);
-        }
       }
     }
 
@@ -126,39 +115,16 @@ exports.updateDeliveryStatus = async (req, res) => {
     } catch (notifyError) {
       console.error("Error sending order status notifications:", notifyError);
     }    
-    //release scrow too
-    // GUARD: Only release funds if moving TO delivered FROM something else
-    if (status === "delivered" && originalStatus !== "delivered") {
-        const shop = await Shop.findById(order.shop_id);
-        if (!shop) {
-          throw new AppError("Shop not found for this order", 404);
-        }
-    
-        const seller = await User.findById(shop.owner_id);
-        if (seller) {
-           // Move funds from pending to account_Balance (Available) for SELLER
-           const sellerAmount = order.total_amount - (order.delivery_fee || 0); // Seller doesn't get delivery fee
-           seller.pending_amount = Math.max(0, (seller.pending_amount || 0) - sellerAmount);
-           seller.account_Balance = (seller.account_Balance || 0) + sellerAmount;
-           await seller.save();
-           console.log(`Funds released for seller ${seller._id}: ${sellerAmount} moved to available balance.`);
-        }
 
-        // --- LOGISTICS PROVIDER PAYOUT ---
-        if (order.logistics_id) {
-          const provider = await User.findById(order.logistics_id);
-          if (provider) {
-            const fee = order.delivery_fee || 0;
-            provider.pending_amount = Math.max(0, (provider.pending_amount || 0) - fee);
-            provider.account_Balance = (provider.account_Balance || 0) + fee;
-            await provider.save();
-            console.log(`Delivery fee released for provider ${provider._id}: ${fee} moved to available balance.`);
-          }
-        }
-    
-        order.escrow_status = "released";
+    // --- ESCROW HOLDING LOGIC ---
+    // Mark delivered orders as ready for admin payout
+    if (status === "delivered" && originalStatus !== "delivered") {
+      if (order.escrow_status !== "released") {
+        order.escrow_status = "held";
         await order.save();
+        console.log(`Order ${order._id} marked as DELIVERED. Funds held for admin payout.`);
       }
+    }
 
     return res.status(200).json({ success: true, message: "Delivery status updated", data: order });
   } catch (error) {
