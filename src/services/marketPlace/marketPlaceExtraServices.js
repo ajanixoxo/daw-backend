@@ -257,7 +257,8 @@ const addItemToCart = async (user_id, product_id, quantity) => {
     throw new AppError("Invalid product ID", 400);
   }
 
-  if (!quantity || quantity <= 0) {
+  quantity = Number(quantity);
+  if (!quantity || quantity <= 0 || !Number.isFinite(quantity)) {
     throw new AppError("Quantity must be greater than 0", 400);
   }
 
