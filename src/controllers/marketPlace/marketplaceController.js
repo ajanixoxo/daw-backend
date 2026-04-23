@@ -1065,41 +1065,12 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     throw new AppError("Order not found", 404);
   }
 
-  const oldStatus = order.status;
   order.status = status;
 
-    // Business logic: When order is delivered, release funds to seller's available balance
-    if (status === "delivered" && oldStatus !== "delivered") {
-      const shop = await Shop.findById(order.shop_id);
-      if (!shop) {
-        throw new AppError("Shop not found for this order", 404);
-      }
-
-      const seller = await User.findById(shop.owner_id);
-      if (seller) {
-        // Move items total from pending to account_Balance (Available) for SELLER
-        const fee = order.delivery_fee || 0;
-        const sellerAmount = order.total_amount - fee;
-        
-        seller.pending_amount = Math.max(0, (seller.pending_amount || 0) - sellerAmount);
-        seller.account_Balance = (seller.account_Balance || 0) + sellerAmount;
-        await seller.save();
-        console.log(`Funds released for seller ${seller._id}: ${sellerAmount} moved to available balance.`);
-        
-        // --- LOGISTICS PROVIDER PAYOUT ---
-        if (order.logistics_id) {
-          const provider = await User.findById(order.logistics_id);
-          if (provider) {
-            provider.pending_amount = Math.max(0, (provider.pending_amount || 0) - fee);
-            provider.account_Balance = (provider.account_Balance || 0) + fee;
-            await provider.save();
-            console.log(`Delivery fee released for provider ${provider._id}: ${fee} moved to available balance.`);
-          }
-        }
-      }
-
-      order.escrow_status = "released";
-    }
+  // Note: Payout logic removed from here to be handled manually by Admin via processAdminPayout
+  if (status === "delivered" && order.escrow_status !== "released") {
+    order.escrow_status = "held"; // Funds are now ready for admin release
+  }
 
   await order.save();
 
@@ -1107,6 +1078,81 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     success: true,
     message: `Order status updated to ${status}`,
     order
+  });
+});
+
+// Manual Payout Release by Admin
+const processAdminPayout = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { payoutAmount } = req.body; // Admin specifies how much to pay the seller
+
+  if (!payoutAmount || isNaN(payoutAmount)) {
+    throw new AppError("Please provide a valid payoutAmount to release to the seller", 400);
+  }
+
+  const order = await Order.findById(orderId);
+  if (!order) {
+    throw new AppError("Order not found", 404);
+  }
+
+  if (order.status !== "delivered") {
+    throw new AppError("Funds can only be released for delivered orders", 400);
+  }
+
+  if (order.escrow_status === "released") {
+    throw new AppError("Funds for this order have already been released", 400);
+  }
+
+  const shop = await Shop.findById(order.shop_id);
+  if (!shop) {
+    throw new AppError("Shop not found for this order", 404);
+  }
+
+  const seller = await User.findById(shop.owner_id);
+  if (!seller) {
+    throw new AppError("Seller not found for this order", 404);
+  }
+
+  // Find the Primary Admin dynamically
+  const primaryAdmin = await User.findOne({ isPrimaryAdmin: true });
+  if (!primaryAdmin) {
+    throw new AppError("Primary Admin account not configured on the system", 500);
+  }
+
+  const deliveryFee = order.delivery_fee || 0;
+  const totalProductAmount = order.total_amount - deliveryFee;
+  
+  if (Number(payoutAmount) > totalProductAmount) {
+    throw new AppError(`Payout amount (${payoutAmount}) cannot exceed the total product price (${totalProductAmount})`, 400);
+  }
+
+  const commissionAmount = totalProductAmount - Number(payoutAmount);
+
+  // 1. Deduct full product price from Primary Admin Treasury (Pending)
+  primaryAdmin.pending_amount = Math.max(0, (primaryAdmin.pending_amount || 0) - totalProductAmount);
+  
+  // 2. Add remaining (commission) to Primary Admin Balance
+  primaryAdmin.account_Balance = (primaryAdmin.account_Balance || 0) + commissionAmount;
+  await primaryAdmin.save();
+
+  // 3. Release specified amount to Seller Balance
+  seller.account_Balance = (seller.account_Balance || 0) + Number(payoutAmount);
+  await seller.save();
+
+  console.log(`Treasury processed for order ${order._id}: ${payoutAmount} to Seller, ${commissionAmount} to Admin.`);
+
+  order.escrow_status = "released";
+  await order.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Funds successfully released and distributed",
+    payoutDetails: {
+      totalAmount: order.total_amount,
+      sellerNet: netSellerAmount,
+      commission: commissionAmount,
+      deliveryFee: deliveryFee
+    }
   });
 });
 
@@ -1249,6 +1295,7 @@ module.exports = {
   trackShopView,
   getShopStats,
   updateOrderStatus,
+  processAdminPayout,
   calculateDeliveryFee,
   orderStatus
 };

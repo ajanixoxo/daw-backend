@@ -53,6 +53,7 @@ router.get(
 
 router.get("/order/status/:orderId", protect, restrictTo("buyer", "seller"),  marketplaceController.orderStatus);
 router.patch("/orders/:orderId/status", protect, restrictTo("admin", "seller"), marketplaceController.updateOrderStatus);
+router.post("/orders/:orderId/payout", protect, restrictTo("admin"), marketplaceController.processAdminPayout);
 router.get("/get/seller/details", protect, restrictTo("admin"), marketplaceController.getSellerDetails);
 
 
